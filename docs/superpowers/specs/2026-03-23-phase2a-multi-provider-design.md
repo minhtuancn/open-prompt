@@ -27,7 +27,7 @@ Mở rộng Open Prompt từ 1 provider cứng (Anthropic) sang hệ thống đa
 │  Ctrl+M → model picker → overlayStore.setProvider()            │
 │  Fallback dialog → user chọn provider thay thế                 │
 └────────────────────┬────────────────────────────────────────────┘
-                     │ query.stream {prompt, provider?}
+                     │ query.stream {prompt, provider?, model?}
                      ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  Go Engine — api/handlers_query.go                              │
@@ -73,6 +73,14 @@ const (
     AuthCLIToken AuthType = "cli_token"
     AuthNone     AuthType = "none" // local models không cần auth
 )
+
+// CompletionRequest là request gửi tới provider
+type CompletionRequest struct {
+    Prompt    string // prompt của user (đã strip @mention)
+    System    string // system prompt (optional)
+    Model     string // model ID cụ thể (optional, override default của provider)
+    MaxTokens int    // 0 = dùng default của provider (thường 1000)
+}
 
 // Provider là interface chung cho tất cả AI providers
 type Provider interface {
@@ -122,9 +130,11 @@ func (r *Registry) Default() (Provider, error)
 func (r *Registry) All() []Provider
 
 // SetPriority cập nhật thứ tự ưu tiên (persist vào model_priority table)
-func (r *Registry) SetPriority(names []string)
+// Trả về error nếu ghi DB thất bại
+func (r *Registry) SetPriority(names []string) error
 
 // FallbackCandidates trả về providers thay thế khi provider chỉ định thất bại
+// Thứ tự theo priority list, bỏ qua failedName
 func (r *Registry) FallbackCandidates(failedName string) []Provider
 ```
 
@@ -164,11 +174,17 @@ Aliases: `["claude", "sonnet", "opus", "haiku", "anthropic"]`
 
 **File:** `go-engine/model/providers/copilot.go`
 
-- Auth: Bearer token từ `gh auth token` (CLIToken)
 - Endpoint: `https://api.githubcopilot.com/chat/completions`
 - Header đặc biệt: `Editor-Version`, `Copilot-Integration-Id`
 - Token exchange: GitHub OAuth token → Copilot session token (có expiry, cần refresh)
 - Aliases: `["copilot", "gh", "github"]`
+
+**Auth fallback chain (theo thứ tự ưu tiên):**
+
+1. **CLIToken** — nếu `gh` CLI có trên máy: chạy `gh auth token` → dùng token trực tiếp. `AuthType()` trả về `AuthCLIToken`.
+2. **Device Flow** — nếu `gh` CLI không có: Go engine chạy GitHub OAuth Device Flow trực tiếp (không cần redirect URI). `AuthType()` trả về `AuthOAuth`.
+
+Detector (`cli.go`) thử path (1) trước. Nếu `exec.ErrNotFound` → đề xuất path (2) trong response `provider.oauth_start`.
 
 ### 4.5 Gateway (OpenAI-compatible)
 
@@ -239,11 +255,11 @@ COHERE_API_KEY           → (placeholder Phase 2B)
 ```
 gh auth token                        → copilot token
 gcloud auth print-access-token       → gemini OAuth token
-claude config get api_key            → claude key
-anthropic config get api_key         → claude key (alternate)
+claude config get api_key            → claude key (nếu Claude Desktop CLI có sẵn)
+anthropic config get api_key         → claude key (alternate CLI)
 ```
 
-Mỗi lệnh chạy với timeout 3 giây. Nếu CLI không tồn tại → skip (không error).
+Mỗi lệnh chạy với timeout 3 giây. Nếu CLI không tồn tại (`exec.ErrNotFound`) → skip gracefully, không trả error. Các lệnh `claude`/`anthropic` CLI có thể không tồn tại trên phần lớn máy — đây là expected behavior.
 
 ### 5.3 Config File Scanner
 
@@ -254,6 +270,7 @@ Mỗi lệnh chạy với timeout 3 giây. Nếu CLI không tồn tại → skip
 ~/.claude/config.json               → Anthropic API key
 ~/.config/litellm/config.yaml       → LiteLLM gateway URL
 ~/.ollama/                          → Ollama installed (→ thêm local gateway)
+~/.config/openai/credentials        → OPENAI_API_KEY (từ OpenAI Python package)
 ```
 
 ### 5.4 Local Port Scanner
@@ -279,17 +296,35 @@ Nếu port mở và `/models` trả về danh sách → tự động tạo Gatew
 
 **File:** `src-tauri/src/oauth.rs`
 
+**Tauri config:** `src-tauri/tauri.conf.json` cần đăng ký custom URL scheme `open-prompt://` trong `allowlist` (Tauri v2: `capabilities`) để WebView có thể intercept redirect.
+
+Go engine generate **PKCE** (`code_verifier` + `code_challenge` theo RFC 7636) khi tạo authorization URL:
+- `code_verifier`: 43–128 ký tự random (base64url)
+- `code_challenge = BASE64URL(SHA256(code_verifier))`
+- `code_challenge_method = S256`
+- `code_verifier` được lưu tạm trong memory, dùng khi exchange token ở `oauth_finish`
+
 ```rust
 #[command]
 pub async fn start_oauth(app: AppHandle, provider: String) -> Result<String, String> {
     // 1. Lấy authorization URL từ Go engine (provider.oauth_start)
+    //    Go đã nhúng code_challenge vào URL
     // 2. Mở WebView window 400×600 với URL đó
     // 3. Monitor navigation events, detect redirect về "open-prompt://oauth?code=..."
     // 4. Intercept code, đóng WebView window
     // 5. Gọi Go engine: provider.oauth_finish {provider, code}
+    //    Go dùng code_verifier đã lưu để exchange token
     // 6. Go engine exchange code → access_token + refresh_token → lưu vào provider_tokens
 }
 ```
+
+**OAuth config bundled trong app** (không yêu cầu user tự tạo):
+
+| Provider | Client ID | Redirect URI | Scopes |
+|---|---|---|---|
+| Google Gemini | Bundle trong binary (Google Cloud project của OpenPrompt) | `open-prompt://oauth` (WebView) hoặc `http://localhost:PORT/callback` (browser) | `https://www.googleapis.com/auth/generative-language` |
+| GitHub Copilot | GitHub OAuth App của OpenPrompt | Device Flow — không cần redirect URI | `copilot` |
+| Anthropic | Placeholder — chưa có public OAuth endpoint | N/A | N/A |
 
 Tauri WebView intercept URL scheme `open-prompt://` — không cần mở browser ngoài.
 
@@ -305,12 +340,15 @@ Khi provider không hỗ trợ custom URL scheme (redirect URI phải là `http:
 
 ### 6.3 GitHub Copilot — Device Flow
 
-GitHub Copilot dùng OAuth Device Flow (không cần redirect URI):
+Khi `gh` CLI không có trên máy, GitHub Copilot dùng OAuth Device Flow (Go engine xử lý trực tiếp, Tauri KHÔNG mở WebView):
 
-1. Go engine request device code từ `github.com/login/device/code`
-2. Hiện cho user: "Mở github.com/login/device, nhập code: **ABCD-1234**"
-3. Poll `github.com/login/oauth/access_token` mỗi 5 giây
-4. Khi user approve → nhận token → exchange sang Copilot session token
+1. React gọi `provider.oauth_start {provider: "copilot"}` → Go trả `{method: "device_flow", device_code: "xxx", user_code: "ABCD-1234", verification_uri: "github.com/login/device"}`
+2. React hiện UI: "Mở github.com/login/device, nhập code: **ABCD-1234**"
+3. React poll `provider.oauth_poll {provider, device_code}` mỗi 5 giây → `{done, token?, error?}`
+4. Khi user approve trên GitHub → Go nhận token → exchange sang Copilot session token → `{done: true}`
+5. Nếu user deny hoặc timeout → `{done: true, error: "access_denied"}` hoặc `{done: true, error: "expired_token"}`
+
+`provider.oauth_start` với `method: "device_flow"` → Tauri **không** gọi `start_oauth` command, chỉ hiển thị device code UI.
 
 ---
 
@@ -386,9 +424,23 @@ User chọn → `query.stream` gửi lại với `provider: "gpt-4o"` và prompt
 
 ## 9. DB Schema bổ sung
 
+Migration này là **version 002** (migration 001 là Phase 1 init). Dùng numbered migration system để đảm bảo idempotency — mỗi migration chỉ chạy 1 lần.
+
 ```sql
+-- Migration 002: Phase 2A Multi-Provider
+
 -- provider_tokens đã có từ Phase 1, thêm cột aliases
+-- Lưu ý: SQLite không có ADD COLUMN IF NOT EXISTS
+-- Migration system phải check version trước khi chạy
 ALTER TABLE provider_tokens ADD COLUMN aliases TEXT DEFAULT '[]'; -- JSON array
+
+-- Thứ tự ưu tiên provider per user
+CREATE TABLE IF NOT EXISTS model_priority (
+    user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    provider_name TEXT    NOT NULL,
+    priority      INTEGER NOT NULL DEFAULT 0, -- số nhỏ hơn = ưu tiên cao hơn
+    PRIMARY KEY (user_id, provider_name)
+);
 
 -- Custom alias mapping per user
 CREATE TABLE IF NOT EXISTS model_aliases (
@@ -426,10 +478,13 @@ CREATE TABLE IF NOT EXISTS custom_gateways (
 | `provider.validate` | `{token, name}` | `{valid, latency_ms, models}` |
 | `provider.oauth_start` | `{token, provider}` | `{url, method: "webview"\|"browser"\|"device_flow", device_code?}` |
 | `provider.oauth_finish` | `{token, provider, code}` | `{ok}` |
-| `provider.oauth_poll` | `{token, provider, device_code}` | `{done, token?}` — Device Flow polling |
-| `query.stream` | `{token, prompt, provider?, system?, max_tokens?}` | stream notifications |
+| `provider.set_priority` | `{token, names: []}` | `{ok}` — cập nhật thứ tự ưu tiên (drag-and-drop trong UI) |
+| `provider.oauth_poll` | `{token, provider, device_code}` | `{done, token?, error?}` — Device Flow polling |
+| `query.stream` | `{token, prompt, provider?, model?, system?, max_tokens?}` | stream notifications |
 
-`query.stream` thêm optional field `provider` — nếu có thì override alias từ `@mention`.
+`query.stream`:
+- `provider` (optional): override alias từ `@mention` — tên provider ("claude", "gpt4")
+- `model` (optional): override model cụ thể trong provider ("claude-3-opus-20240229") — khác với provider alias
 
 ---
 
@@ -439,17 +494,17 @@ CREATE TABLE IF NOT EXISTS custom_gateways (
 
 ```
 go-engine/model/providers/
-├── interface.go        ← NEW: Provider interface, AuthType
+├── interface.go        ← NEW: Provider interface, AuthType, CompletionRequest
 ├── registry.go         ← NEW: ProviderRegistry
 ├── anthropic.go        ← REFACTOR: implement Provider interface
 ├── openai.go           ← NEW: OpenAI + Azure OpenAI
 ├── gemini.go           ← NEW: Google Gemini (OAuth + API key)
-├── copilot.go          ← NEW: GitHub Copilot (Device Flow)
+├── copilot.go          ← NEW: GitHub Copilot (CLIToken + Device Flow fallback)
 ├── gateway.go          ← NEW: Generic OpenAI-compat gateway
 └── detector/
     ├── detector.go     ← NEW: RunAll() song song
     ├── env.go          ← NEW: env var scanner
-    ← NEW: CLI scanner
+    ├── cli.go          ← NEW: CLI scanner (gh, gcloud, claude, anthropic)
     ├── configfile.go   ← NEW: config file scanner
     └── localport.go    ← NEW: TCP port scanner
 
@@ -460,11 +515,13 @@ go-engine/api/
 └── router.go           ← MODIFY: thêm provider.* routes
 ```
 
-### Tauri (mới)
+### Tauri (mới + sửa)
 
 ```
 src-tauri/src/
-└── oauth.rs            ← NEW: start_oauth command (WebView + browser fallback)
+└── oauth.rs               ← NEW: start_oauth command (WebView + browser fallback)
+src-tauri/tauri.conf.json  ← MODIFY: đăng ký custom URL scheme "open-prompt://"
+                              trong capabilities để WebView intercept OAuth redirect
 ```
 
 ### React (mới + sửa)
@@ -479,6 +536,8 @@ src/components/
 └── settings/
     ├── ProvidersPanel.tsx  ← NEW: danh sách providers + status
     └── GatewayForm.tsx     ← NEW: thêm custom gateway
+
+src/store/overlayStore.ts   ← MODIFY: thêm activeProvider, activeModel fields
 ```
 
 ---
@@ -513,3 +572,4 @@ Phase 2A hoàn thành khi:
 4. `Ctrl+M` mở model picker, switch provider, query thành công
 5. Khi provider trả lỗi rate_limit, FallbackDialog hiện và retry thành công
 6. All Go unit tests pass
+7. Gemini OAuth qua WebView thành công: user login Google, token lưu vào DB, `@gemini` query trả kết quả
