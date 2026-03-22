@@ -1,0 +1,104 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-go-engine:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            goos: linux
+            goarch: amd64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            goos: darwin
+            goarch: amd64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            goos: windows
+            goarch: amd64
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+          cache-dependency-path: go-engine/go.sum
+
+      - name: Build Go engine (Linux/macOS)
+        if: matrix.os != 'windows-latest'
+        working-directory: go-engine
+        run: |
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
+            go build -o ../src-tauri/binaries/go-engine-${{ matrix.target }} .
+
+      - name: Build Go engine (Windows)
+        if: matrix.os == 'windows-latest'
+        working-directory: go-engine
+        run: |
+          $env:GOOS="${{ matrix.goos }}"
+          $env:GOARCH="${{ matrix.goarch }}"
+          go build -o ../src-tauri/binaries/go-engine-${{ matrix.target }}.exe .
+
+      - name: Upload Go engine binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-engine-${{ matrix.target }}
+          path: src-tauri/binaries/go-engine-${{ matrix.target }}*
+
+  build-tauri:
+    needs: build-go-engine
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: macos-latest
+            target: x86_64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install frontend deps
+        run: npm ci
+
+      - name: Download Go engine binary
+        uses: actions/download-artifact@v4
+        with:
+          name: go-engine-${{ matrix.target }}
+          path: src-tauri/binaries/
+
+      - name: Make binary executable (Linux/macOS)
+        if: matrix.os != 'windows-latest'
+        run: chmod +x src-tauri/binaries/go-engine-${{ matrix.target }}
+
+      - name: Install Linux dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: --target ${{ matrix.target }}
