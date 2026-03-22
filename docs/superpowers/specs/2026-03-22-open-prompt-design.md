@@ -73,7 +73,76 @@ Open Prompt là một desktop AI assistant chạy trên Windows, Linux và macOS
 
 **Giao tiếp Rust ↔ Go:** Unix socket (Linux/macOS), Named Pipe (Windows). Go Engine expose JSON-RPC 2.0 API. Không expose ra ngoài máy.
 
-**Startup flow:** Tauri spawn Go sidecar → Go khởi tạo SQLite + migrations → Go listen socket → Tauri ready → nhận hotkey.
+**Socket authentication:** Khi spawn Go sidecar, Tauri truyền một `shared_secret` (32-byte random) qua environment variable `OP_SOCKET_SECRET`. Mỗi JSON-RPC request phải có header `X-Secret: <shared_secret>`. Go Engine từ chối request không có header đúng. Chống process khác trên máy connect vào socket.
+
+**Startup flow:** Tauri spawn Go sidecar (với `OP_SOCKET_SECRET`) → Go khởi tạo SQLite + migrations → Go listen socket → Go gửi `ready` signal qua stdout → Tauri ready → nhận hotkey.
+
+### JSON-RPC 2.0 API Contract
+
+**Streaming:** Go Engine dùng JSON-RPC notifications (`method: "stream.chunk"`) để push từng token. Rust nhận qua socket read loop và forward lên React qua Tauri event.
+
+**Core methods:**
+
+```jsonc
+// Auth
+{ "method": "auth.login",    "params": { "username": string, "password": string } }
+// → { "token": string, "user": User }
+
+{ "method": "auth.logout",   "params": { "token": string } }
+{ "method": "auth.me",       "params": { "token": string } }
+
+// Query (streaming)
+{ "method": "query.stream",  "params": { "token": string, "input": string, "skill_id"?: int, "slash_name"?: string } }
+// → notifications: { "method": "stream.chunk",  "params": { "delta": string, "done": false } }
+// → notification:  { "method": "stream.chunk",  "params": { "delta": "",     "done": true, "usage": Usage } }
+
+// Query (non-streaming)
+{ "method": "query.run",     "params": { "token": string, "input": string, "skill_id"?: int } }
+// → { "response": string, "usage": Usage }
+
+// Providers
+{ "method": "providers.list",   "params": { "token": string } }
+{ "method": "providers.detect", "params": { "token": string } }
+{ "method": "providers.connect_oauth", "params": { "token": string, "provider_id": string } }
+
+// Prompts
+{ "method": "prompts.list",   "params": { "token": string, "search"?: string, "category"?: string } }
+{ "method": "prompts.create", "params": { "token": string, "prompt": PromptInput } }
+{ "method": "prompts.update", "params": { "token": string, "id": int, "prompt": PromptInput } }
+{ "method": "prompts.delete", "params": { "token": string, "id": int } }
+
+// Skills
+{ "method": "skills.list",   "params": { "token": string } }
+{ "method": "skills.create", "params": { "token": string, "skill": SkillInput } }
+{ "method": "skills.update", "params": { "token": string, "id": int, "skill": SkillInput } }
+{ "method": "skills.delete", "params": { "token": string, "id": int } }
+
+// Slash commands
+{ "method": "commands.list",    "params": { "token": string, "query"?: string } }
+{ "method": "commands.resolve", "params": { "token": string, "slash_name": string } }
+
+// Settings
+{ "method": "settings.get", "params": { "token": string, "key": string } }
+{ "method": "settings.set", "params": { "token": string, "key": string, "value": any } }
+
+// Analytics
+{ "method": "analytics.summary", "params": { "token": string, "period": "7d"|"30d"|"90d" } }
+{ "method": "analytics.by_provider", "params": { "token": string, "period": string } }
+{ "method": "analytics.token_expiry","params": { "token": string } }
+
+// i18n
+{ "method": "i18n.locale", "params": { "lang": string } }
+// → { "messages": Record<string, string> }
+```
+
+**Error format:**
+```jsonc
+{ "error": { "code": -32001, "message": "unauthorized" } }
+{ "error": { "code": -32002, "message": "provider_not_found" } }
+{ "error": { "code": -32003, "message": "all_providers_failed", "data": { "attempts": [...] } } }
+```
+
+**Startup flow:** Tauri spawn Go sidecar (với `OP_SOCKET_SECRET`) → Go khởi tạo SQLite + migrations → Go listen socket → Go gửi `ready` signal qua stdout → Tauri ready → nhận hotkey.
 
 ---
 
@@ -94,8 +163,24 @@ CI/CD build tất cả 3 platform song song từ ngày đầu.
 - `minhtuancn/open-prompt` — private repo, chứa toàn bộ source code
 - `minhtuancn/open-prompt-release` — public repo, là git submodule trong private repo
 - Submodule path: `open-prompt/open-prompt-release/`
-- Public repo chứa: compiled binaries, CHANGELOG.md, README.md, release notes
-- Quy trình: tag version trên private → GitHub Actions build 3 platform → upload binaries lên public repo release
+- Public repo chứa: CHANGELOG.md, README.md, release notes (không track binary trong git)
+- **Binaries:** upload lên GitHub Releases assets (không commit vào git repo)
+- Quy trình: tag `vX.Y.Z` trên private → GitHub Actions build 3 platform → sign binaries → upload lên public repo GitHub Releases
+
+**Code signing:**
+- Windows: Authenticode signature (self-signed cho dev, certificate cho production)
+- macOS: Apple Developer ID + notarization (bắt buộc từ macOS 10.15+)
+- Linux: GPG signature của tarball
+
+**Tauri updater config:**
+```json
+{
+  "updater": {
+    "endpoints": ["https://github.com/minhtuancn/open-prompt-release/releases/latest/download/update-manifest.json"],
+    "pubkey": "<ed25519 public key>"
+  }
+}
+```
 
 ---
 
@@ -236,6 +321,7 @@ open-prompt/                          ← private repo (source)
 │   │       ├── skill_repo.go
 │   │       ├── project_repo.go
 │   │       ├── history_repo.go
+│   │       ├── analytics_repo.go         ← usage_daily CRUD + aggregation
 │   │       └── settings_repo.go
 │   └── config/
 │       ├── settings.go
@@ -292,17 +378,30 @@ CREATE TABLE prompts (
 );
 
 -- Skills
+-- Skill có thể link đến prompt (prompt_id) HOẶC có inline prompt_text riêng.
+-- Ưu tiên: nếu prompt_id != NULL thì dùng prompts.content; ngược lại dùng prompt_text.
 CREATE TABLE skills (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id     INTEGER NOT NULL REFERENCES users(id),
     name        TEXT NOT NULL,
-    prompt_id   INTEGER REFERENCES prompts(id),
+    prompt_id   INTEGER REFERENCES prompts(id) ON DELETE SET NULL,
+    prompt_text TEXT,                     -- inline prompt khi không link prompt
     model       TEXT,
     provider    TEXT,
-    config_json TEXT,                     -- JSON: temperature, max_tokens, etc.
+    config_json TEXT,                     -- JSON (xem schema bên dưới)
     tags        TEXT,                     -- JSON array
     created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- config_json schema:
+-- {
+--   "temperature": 0.0-2.0 (default 0.7),
+--   "max_tokens": integer (default 1000),
+--   "top_p": 0.0-1.0 (default 1.0),
+--   "system": string (system prompt override),
+--   "timeout_ms": integer (default 30000),
+--   "stream": boolean (default true)
+-- }
 
 -- Settings (per-user key-value)
 CREATE TABLE settings (
@@ -375,16 +474,38 @@ CREATE TABLE usage_daily (
 
 ## 7. Provider System
 
+### Consent Flow (First-time scan)
+
+Lần đầu chạy app, **sau khi tạo tài khoản**, hiển thị dialog:
+> "Open Prompt muốn tìm kiếm các AI provider đã được cài đặt trên máy (Claude CLI, GitHub Copilot, Gemini...) để tái sử dụng token có sẵn. Chúng tôi sẽ quét các file config trong home directory của bạn. Không có dữ liệu nào được gửi ra ngoài."
+> [Cho phép] [Bỏ qua]
+
+Nếu user chọn "Bỏ qua": không scan, chỉ detect từ environment variables.
+Setting `provider.auto_detect_enabled` (true/false) có thể thay đổi sau trong Settings.
+
+### Tần suất scan
+
+- **Startup:** scan đầy đủ khi app khởi động
+- **File watcher:** real-time theo dõi các file config đã biết (inotify/FSEvents)
+- **Periodic:** re-scan mỗi 30 phút (background goroutine)
+- **Manual:** nút "Scan now" trong Settings > Providers
+
 ### Auto-Detection Sources (theo thứ tự ưu tiên)
 
 1. **Environment Variables** — `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `GITHUB_TOKEN`
-2. **Config Files**
-   - `~/.claude/claude.json` hoặc `~/.claude.json` → Claude CLI
-   - `%APPDATA%/Claude/` (Windows) / `~/.config/Claude/` (Linux) → Claude Desktop
-   - `~/.config/gh/hosts.yml` → GitHub CLI → Copilot token
-   - `~/.config/gcloud/credentials.db` → Gemini via gcloud
-   - `~/.gemini/` → Gemini CLI
-   - `~/.vscode/extensions/github.copilot-*/` → VS Code Copilot
+2. **Config Files** (chỉ khi `auto_detect_enabled = true`)
+
+   | File path | Token field | Provider |
+   |-----------|------------|---------|
+   | `~/.claude/claude.json` | `$.api_key` | Claude CLI |
+   | `~/.claude.json` | `$.api_key` | Claude CLI (alt) |
+   | `%APPDATA%/Claude/config.json` (Win) | `$.api_key` | Claude Desktop |
+   | `~/.config/Claude/config.json` (Linux) | `$.api_key` | Claude Desktop |
+   | `~/.config/gh/hosts.yml` | `github.com.oauth_token` | GitHub Copilot |
+   | `~/.config/gcloud/application_default_credentials.json` | `$.access_token` | Gemini |
+   | `~/.gemini/credentials.json` | `$.access_token` | Gemini CLI |
+   | `~/.vscode/extensions/github.copilot-*/dist/` | parse từ extension storage | VS Code Copilot |
+
 3. **System Keychain** — Windows Credential Manager / libsecret / macOS Keychain
 4. **Running Processes** — detect `ollama`, `claude`, `gemini-cli` đang chạy
 
@@ -419,11 +540,22 @@ Security: chỉ lắng nghe `127.0.0.1`, state parameter random (CSRF protection
 
 ### Token Expiry & Auto-refresh
 
-- Background goroutine scan expiry mỗi 30 phút
-- File watcher (inotify/FSEvents/ReadDirectoryChangesW) theo dõi config changes
-- Auto-refresh trước khi hết hạn 24h
-- Notification UI khi token còn < 24h
-- Badge đỏ trên system tray khi có provider expired
+**Per-provider refresh threshold:**
+
+| Provider | Token TTL | Refresh khi còn | Retry nếu fail |
+|----------|-----------|----------------|---------------|
+| GitHub Copilot (Device Flow) | ~8 giờ | 1 giờ | 3 lần, backoff 5/15/60 phút |
+| Gemini access_token | 1 giờ | 10 phút | 3 lần, backoff 1/5/15 phút |
+| Gemini refresh_token | Không hết hạn | N/A | Re-OAuth nếu revoked |
+| Claude API key | Không hết hạn | N/A | Alert nếu 401 |
+
+**Token revocation detection:**
+- Nếu API call trả về 401/403 → mark token invalid → notification "Re-login required"
+- Không tự động re-OAuth (tránh pop browser không mong muốn)
+
+**Background goroutine:** check mỗi 30 phút; file watcher cho real-time changes.
+**Notification UI:** khi token còn trong ngưỡng refresh.
+**Badge đỏ** trên system tray khi có provider expired hoặc refresh fail.
 
 ---
 
@@ -450,9 +582,39 @@ Priority 4: Ollama llama3        ← offline fallback cuối
 
 ### Fallback Strategies
 
-- `sequential` — thử lần lượt theo priority
-- `latency-based` — chọn provider có latency thấp nhất gần đây
-- `cost-based` — chọn provider rẻ nhất có sẵn
+**User chọn strategy trong Settings > Model Router:**
+
+| Strategy | Mô tả | Data source |
+|----------|-------|-------------|
+| `sequential` | Thử lần lượt theo priority order | Không cần data |
+| `latency-based` | Chọn provider có p95 latency thấp nhất trong 24h qua | `history` table: avg(latency_ms) per model |
+| `cost-based` | Chọn provider rẻ nhất hiện có | Hardcoded cost table ($/1K tokens), user có thể override |
+
+**Cost table (hardcoded, updatable qua app update):**
+```json
+{
+  "claude-3.5-sonnet": { "input": 0.003, "output": 0.015 },
+  "gemini-1.5-pro":    { "input": 0.00125, "output": 0.005 },
+  "gpt-4o":            { "input": 0.005, "output": 0.015 },
+  "ollama/*":          { "input": 0.0, "output": 0.0 }
+}
+```
+
+**Khi toàn bộ chain exhausted (tất cả providers fail):**
+1. Trả về lỗi có cấu trúc: `{ "error": "all_providers_failed", "attempts": [...] }`
+2. UI hiển thị thông báo với danh sách lý do từng provider
+3. Nút "Retry" và "Try offline (Ollama)" nếu Ollama available
+4. Không có silent fail — luôn thông báo user
+
+**Reorder priority — xử lý SQLite UNIQUE constraint:**
+Swap priority dùng temp value âm trong single transaction:
+```sql
+BEGIN;
+UPDATE model_priority SET priority = -1 WHERE user_id=? AND priority=1;
+UPDATE model_priority SET priority = 1  WHERE user_id=? AND priority=2;
+UPDATE model_priority SET priority = 2  WHERE user_id=? AND priority=-1;
+COMMIT;
+```
 
 Mỗi lần fallback ghi lý do vào `history.fallback_from` để hiển thị UI.
 
@@ -469,11 +631,15 @@ Mỗi lần fallback ghi lý do vào `history.fallback_from` để hiển thị 
 
 ### 9.2 Overlay UI
 
-- Always-on-top window, centered
+- **Vị trí:** Center của **active monitor** (monitor chứa cursor khi hotkey được nhấn)
+- **Kích thước:** Fixed width 640px, height auto (min 64px, max 480px tự expand khi response dài)
+- Always-on-top window
 - Auto-focus khi mở
-- Đóng: Escape / click ngoài
-- Thu nhỏ về system tray
-- Animation: slide-down + fade (60fps)
+- **Đóng:** Escape / click ngoài overlay
+- **Khi đang stream response + click ngoài:** cancel stream → đóng overlay (không chờ xong)
+- **Response overflow:** overlay expand tới max-height 480px, sau đó scroll bên trong
+- Thu nhỏ về system tray (click X hoặc phím tắt)
+- Animation: slide-down + fade (60fps target)
 - Keyboard-first navigation
 
 ### 9.3 Slash Command System
@@ -481,30 +647,84 @@ Mỗi lần fallback ghi lý do vào `history.fallback_from` để hiển thị 
 ```
 / → hiển thị danh sách command
 /em → fuzzy filter "email"
+```
 
-Command structure:
+**slash_name validation:**
+- Chỉ chứa: `a-z`, `0-9`, `-`, `_` (lowercase, no spaces)
+- Độ dài: 1–32 ký tự
+- Unique per user
+- Case-insensitive khi match: `/Email` = `/email`
+
+**Template Engine:**
+
+Dùng Go `text/template` syntax (đơn giản, built-in):
+- `{{.input}}` — nội dung user nhập sau slash command
+- `{{.lang}}` — variable tuỳ chỉnh
+- `{{.context.app}}` — tên app đang active
+- Escape literal `{{`: dùng `{{"{{"}}`
+
+**Multi-variable UI flow:**
+
+Khi prompt template có variables ngoài `{{.input}}`:
+1. User gõ `/translate Hello world`
+2. System detect template có `{{.lang}}`
+3. Hiển thị mini form bên dưới CommandInput:
+   ```
+   ┌─────────────────────────┐
+   │ /translate              │
+   │ Input: Hello world      │
+   │ lang: [____________]    │
+   │              [Run →]    │
+   └─────────────────────────┘
+   ```
+4. User điền `lang = "Vietnamese"` → Enter → run
+
+Variables tự động extract từ template bằng regex `\{\{\.(\w+)\}\}` (bỏ qua `input` và `context.*`).
+
+**Command structure:**
+```json
 {
-  name: "email",
-  description: "Viết email chuyên nghiệp",
-  category: "business",
-  prompt: "...",
-  model: "claude-3.5-sonnet",
-  provider: "anthropic"
+  "slash_name": "email",
+  "title": "Viết Email",
+  "description": "Viết email chuyên nghiệp",
+  "category": "business",
+  "content": "Bạn là chuyên gia... {{.input}}",
+  "model": "claude-3.5-sonnet",
+  "provider": "anthropic"
 }
 ```
 
-- Fuzzy search (fuse.js)
+- Fuzzy search (fuse.js) trên `slash_name` + `title` + `description`
 - Keyboard navigation (↑↓ Enter)
 - Nhóm theo category
-- Context-aware: ưu tiên command phù hợp app đang dùng
+- Context-aware: ưu tiên command phù hợp app đang dùng (mapping trong Settings)
 
 ### 9.4 Input Injection
 
-1. Copy response vào clipboard
-2. Simulate `Ctrl+V` paste vào app đang focus
-3. Fallback: simulated typing (enigo) nếu paste không được
+**Flow chi tiết:**
 
-Vietnamese UTF-8 compatible, tương thích UniKey.
+1. Backup nội dung clipboard hiện tại (lưu vào memory)
+2. Copy response vào clipboard
+3. Simulate `Ctrl+V` paste vào app đang focus
+4. Chờ 200ms sau paste
+5. Restore clipboard về nội dung gốc (bước 1)
+
+**Fallback sang simulated typing:**
+- Trigger khi: Ctrl+V không có phản hồi sau 500ms (text không xuất hiện trong target app)
+- Trigger khi: app đích là terminal emulator (detect process name: `wt.exe`, `alacritty`, `kitty`, `gnome-terminal`, `iTerm2`)
+- Simulated typing: enigo crate, gõ từng ký tự UTF-8
+- Delay giữa các ký tự: 10ms (tránh miss keystrokes)
+
+**Không inject khi:**
+- Active window là chính Open Prompt
+- Active window là game full-screen (detect bằng `HWND_TOPMOST` + full resolution match)
+
+**Vietnamese/UniKey:** Inject raw Unicode characters, không dùng VNI/TELEX keystrokes. Compatible với UniKey vì UniKey xử lý ở input method layer, inject trực tiếp Unicode bypass IME không conflict.
+
+**Platform specifics:**
+- Windows: `SendInput` với `KEYEVENTF_UNICODE`
+- macOS: `AXUIElementSetAttributeValue` với `kAXValueAttribute`; cần Accessibility permission từ System Preferences
+- Linux: `xdotool type --clearmodifiers` (X11); Wayland: `wtype` hoặc `ydotool` (requires uinput group membership)
 
 ### 9.5 Context Awareness
 
@@ -516,9 +736,20 @@ Detect active application (process name + window title):
 ### 9.6 Multi-user Auth
 
 - Local login với bcrypt (cost factor 12)
-- Session token (JWT, expire 24h, lưu memory)
+- Session token (JWT, expire 7 ngày, **lưu encrypted trong file** `~/.open-prompt/session.dat`, encrypt bằng AES-256-GCM với key từ OS keychain)
+- Session tự động load khi app khởi động — user không cần login lại sau restart
+- Session expire sau 7 ngày không active, hoặc khi user logout thủ công
 - Mỗi user có prompt/skill/settings riêng
 - Avatar color để phân biệt user
+
+**First-run onboarding flow:**
+1. App khởi động lần đầu → không có user trong DB
+2. Hiển thị màn hình "Create your account" (không thể bỏ qua)
+3. User nhập username + password (min 8 ký tự)
+4. Tạo user đầu tiên → tự động login → vào màn hình chính
+5. Sau đó có thể thêm user khác trong Settings > Users
+
+**Multi-user switch:** User switcher ở system tray menu; switch yêu cầu nhập password user đích.
 
 ### 9.7 Auto-update
 
@@ -542,8 +773,12 @@ Detect active application (process name + window title):
 ### Data Collection
 
 - Ghi sau mỗi request: provider, model, tokens, latency, status
-- Daily aggregation job (chạy midnight) → `usage_daily` table
+- Daily aggregation job: chạy khi app khởi động (catch-up nếu missed) và mỗi midnight theo **local timezone của máy**
 - Không gửi data ra ngoài (local-first)
+
+**Retention policy:**
+- Raw `history`: giữ 90 ngày, sau đó xóa tự động
+- `usage_daily` aggregate: giữ vĩnh viễn (dữ liệu nhỏ ~1KB/ngày)
 
 ---
 
@@ -571,9 +806,13 @@ Implementation: `react-i18next` trên frontend. Go Engine cung cấp locale data
 - Local callback OAuth server: chỉ lắng nghe `127.0.0.1`
 - State parameter random cho CSRF protection
 - Bcrypt cost factor 12 cho password hashing
-- SQLite file: permission 600 (chỉ owner đọc được)
-- Tauri capabilities: giới hạn quyền WebView tối thiểu
-- Không log tokens, keys trong bất kỳ log file nào
+- SQLite file permission:
+  - Linux/macOS: `chmod 600` (owner read/write only)
+  - Windows: ACL restrict về `SYSTEM` + current user only (SetFileSecurity)
+- Socket authentication: shared secret qua env var `OP_SOCKET_SECRET` (xem Section 2)
+- Tauri capabilities (allowlist tối thiểu): `shell.open`, `window.setAlwaysOnTop`, `globalShortcut.register`, `systemTray`, `updater`; **không** có `fs` hay `http` access từ WebView
+- Không log tokens, keys, hoặc password hash trong bất kỳ log file nào
+- Rate limit local JSON-RPC: max 100 requests/giây (chống abuse từ process khác dù đã có socket secret)
 
 ---
 
@@ -601,8 +840,9 @@ Implementation: `react-i18next` trên frontend. Go Engine cung cấp locale data
     "slash_name": "translate",
     "title": "Dịch thuật",
     "category": "language",
-    "content": "Dịch nội dung sau sang {{lang}}: {{input}}",
-    "model": "gemini-1.5-pro"
+    "content": "Dịch nội dung sau sang {{.lang}}: {{.input}}",
+    "model": "gemini-1.5-pro",
+    "variables": ["lang"]
   }
 ]
 ```
