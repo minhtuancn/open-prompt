@@ -1,0 +1,1 @@
+{"main-capability":{"identifier":"main-capability","description":"Capability for the overlay window","local":true,"windows":["overlay"],"permissions":["core:default","shell:allow-execute","shell:allow-open","global-shortcut:allow-register","global-shortcut:allow-unregister"]}}

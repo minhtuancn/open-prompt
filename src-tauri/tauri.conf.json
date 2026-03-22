@@ -1,0 +1,43 @@
+{
+  "productName": "open-prompt",
+  "version": "0.1.0",
+  "identifier": "com.minhtuancn.open-prompt",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "overlay",
+        "title": "Open Prompt",
+        "width": 640,
+        "height": 80,
+        "minWidth": 640,
+        "maxWidth": 640,
+        "minHeight": 64,
+        "maxHeight": 480,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "center": true,
+        "focus": true
+      }
+    ],
+    "trayIcon": {
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": true
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": ["icons/icon.png"],
+    "externalBin": ["binaries/go-engine"]
+  }
+}

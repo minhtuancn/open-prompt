@@ -1,0 +1,18 @@
+# Node
+node_modules/
+dist/
+
+# Rust / Tauri
+src-tauri/target/
+
+# Local dev libs (for cargo check without system GTK headers)
+# These are extracted from .deb packages, not committed
+/local-libs/
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
