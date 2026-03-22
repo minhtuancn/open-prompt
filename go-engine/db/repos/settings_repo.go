@@ -2,6 +2,7 @@ package repos
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/minhtuancn/open-prompt/go-engine/db"
@@ -23,7 +24,7 @@ func (r *SettingsRepo) Get(userID int64, key string) (string, error) {
 	err := r.db.QueryRow(
 		`SELECT value FROM settings WHERE user_id = ? AND key = ?`, userID, key,
 	).Scan(&value)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
 	if err != nil {

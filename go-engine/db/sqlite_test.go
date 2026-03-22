@@ -34,7 +34,7 @@ func TestOpenAndMigrate(t *testing.T) {
 }
 
 func TestUserRepo(t *testing.T) {
-	database, _ := openTestDB(t)
+	database := openTestDB(t)
 	repo := repos.NewUserRepo(database)
 
 	// Create user
@@ -69,7 +69,7 @@ func TestUserRepo(t *testing.T) {
 }
 
 func TestSettingsRepo(t *testing.T) {
-	database, _ := openTestDB(t)
+	database := openTestDB(t)
 	userRepo := repos.NewUserRepo(database)
 	settingsRepo := repos.NewSettingsRepo(database)
 
@@ -98,7 +98,7 @@ func TestSettingsRepo(t *testing.T) {
 	}
 }
 
-func openTestDB(t *testing.T) (*db.DB, error) {
+func openTestDB(t *testing.T) *db.DB {
 	t.Helper()
 	database, err := db.OpenInMemory()
 	if err != nil {
@@ -108,5 +108,5 @@ func openTestDB(t *testing.T) (*db.DB, error) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { database.Close() })
-	return database, nil
+	return database
 }

@@ -2,6 +2,7 @@ package repos
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -38,7 +39,10 @@ func (r *UserRepo) Create(username, passwordHash string) (*User, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create user: %w", err)
 	}
-	id, _ := res.LastInsertId()
+	id, err := res.LastInsertId()
+	if err != nil {
+		return nil, fmt.Errorf("create user: get last insert id: %w", err)
+	}
 	return r.FindByID(id)
 }
 
@@ -49,7 +53,7 @@ func (r *UserRepo) FindByUsername(username string) (*User, error) {
 		`SELECT id, username, display_name, password_hash, avatar_color, created_at, last_login
 		 FROM users WHERE username = ?`, username,
 	).Scan(&u.ID, &u.Username, &u.DisplayName, &u.PasswordHash, &u.AvatarColor, &u.CreatedAt, &u.LastLogin)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -65,7 +69,7 @@ func (r *UserRepo) FindByID(id int64) (*User, error) {
 		`SELECT id, username, display_name, password_hash, avatar_color, created_at, last_login
 		 FROM users WHERE id = ?`, id,
 	).Scan(&u.ID, &u.Username, &u.DisplayName, &u.PasswordHash, &u.AvatarColor, &u.CreatedAt, &u.LastLogin)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -77,12 +81,17 @@ func (r *UserRepo) FindByID(id int64) (*User, error) {
 // Count trả về tổng số users (dùng để detect first-run)
 func (r *UserRepo) Count() (int, error) {
 	var count int
-	err := r.db.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&count)
-	return count, err
+	if err := r.db.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&count); err != nil {
+		return 0, fmt.Errorf("count users: %w", err)
+	}
+	return count, nil
 }
 
 // UpdateLastLogin cập nhật thời gian login cuối
 func (r *UserRepo) UpdateLastLogin(id int64) error {
 	_, err := r.db.Exec(`UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?`, id)
-	return err
+	if err != nil {
+		return fmt.Errorf("update last login: %w", err)
+	}
+	return nil
 }
