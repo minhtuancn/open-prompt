@@ -18,12 +18,13 @@ type Claims struct {
 
 // issueToken tạo JWT cho user
 func issueToken(userID int64, username, secret string) (string, error) {
+	now := time.Now()
 	claims := Claims{
 		UserID:   userID,
 		Username: username,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().AddDate(0, 0, config.DefaultJWTExpiry)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			ExpiresAt: jwt.NewNumericDate(now.AddDate(0, 0, config.DefaultJWTExpiry)),
+			IssuedAt:  jwt.NewNumericDate(now),
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -34,7 +35,7 @@ func issueToken(userID int64, username, secret string) (string, error) {
 func parseToken(tokenStr, secret string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+			return nil, fmt.Errorf("unexpected signing method")
 		}
 		return []byte(secret), nil
 	})

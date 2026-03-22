@@ -3,6 +3,7 @@ package auth
 import (
 	"errors"
 	"fmt"
+	"os"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -11,10 +12,11 @@ import (
 )
 
 var (
-	ErrUserExists       = errors.New("username already exists")
-	ErrUserNotFound     = errors.New("user not found")
-	ErrInvalidPassword  = errors.New("invalid password")
-	ErrPasswordTooShort = errors.New("password must be at least 8 characters")
+	ErrUserExists          = errors.New("username already exists")
+	ErrUserNotFound        = errors.New("user not found")
+	ErrInvalidPassword     = errors.New("invalid password")
+	ErrPasswordTooShort    = errors.New("password must be at least 8 characters")
+	ErrInvalidCredentials  = errors.New("invalid username or password")
 )
 
 // Service xử lý authentication logic
@@ -23,9 +25,12 @@ type Service struct {
 	jwtSecret string
 }
 
-// NewService tạo auth service mới
-func NewService(userRepo *repos.UserRepo, jwtSecret string) *Service {
-	return &Service{users: userRepo, jwtSecret: jwtSecret}
+// NewService tạo auth service mới, trả về lỗi nếu jwtSecret quá ngắn
+func NewService(userRepo *repos.UserRepo, jwtSecret string) (*Service, error) {
+	if len(jwtSecret) < 16 {
+		return nil, errors.New("jwt secret must be at least 16 bytes")
+	}
+	return &Service{users: userRepo, jwtSecret: jwtSecret}, nil
 }
 
 // IsFirstRun kiểm tra xem có user nào trong DB chưa
@@ -67,14 +72,17 @@ func (s *Service) Login(username, password string) (string, error) {
 		return "", fmt.Errorf("find user: %w", err)
 	}
 	if user == nil {
-		return "", ErrUserNotFound
+		return "", ErrInvalidCredentials
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
-		return "", ErrInvalidPassword
+		return "", ErrInvalidCredentials
 	}
 
-	_ = s.users.UpdateLastLogin(user.ID)
+	if err := s.users.UpdateLastLogin(user.ID); err != nil {
+		// Không block login nếu audit trail thất bại
+		fmt.Fprintf(os.Stderr, "warn: update last login for user %d: %v\n", user.ID, err)
+	}
 
 	return issueToken(user.ID, user.Username, s.jwtSecret)
 }

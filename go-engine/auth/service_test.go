@@ -1,6 +1,7 @@
 package auth_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/minhtuancn/open-prompt/go-engine/auth"
@@ -24,7 +25,10 @@ func setupTestDB(t *testing.T) *db.DB {
 func TestRegisterAndLogin(t *testing.T) {
 	database := setupTestDB(t)
 	userRepo := repos.NewUserRepo(database)
-	svc := auth.NewService(userRepo, "test-jwt-secret")
+	svc, err := auth.NewService(userRepo, "test-jwt-secret-16chars")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Register
 	user, err := svc.Register("alice", "password123")
@@ -57,19 +61,39 @@ func TestRegisterAndLogin(t *testing.T) {
 func TestLoginWrongPassword(t *testing.T) {
 	database := setupTestDB(t)
 	userRepo := repos.NewUserRepo(database)
-	svc := auth.NewService(userRepo, "test-jwt-secret")
+	svc, err := auth.NewService(userRepo, "test-jwt-secret-16chars")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	_, _ = svc.Register("bob", "correct-password")
-	_, err := svc.Login("bob", "wrong")
-	if err == nil {
-		t.Error("expected error for wrong password")
+	_, err = svc.Login("bob", "wrong")
+	if !errors.Is(err, auth.ErrInvalidCredentials) {
+		t.Errorf("expected ErrInvalidCredentials, got %v", err)
+	}
+}
+
+func TestLoginUnknownUser(t *testing.T) {
+	database := setupTestDB(t)
+	userRepo := repos.NewUserRepo(database)
+	svc, err := auth.NewService(userRepo, "test-jwt-secret-16chars")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = svc.Login("nobody", "password")
+	if !errors.Is(err, auth.ErrInvalidCredentials) {
+		t.Errorf("expected ErrInvalidCredentials, got %v", err)
 	}
 }
 
 func TestFirstRun(t *testing.T) {
 	database := setupTestDB(t)
 	userRepo := repos.NewUserRepo(database)
-	svc := auth.NewService(userRepo, "test-jwt-secret")
+	svc, err := auth.NewService(userRepo, "test-jwt-secret-16chars")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	isFirst, err := svc.IsFirstRun()
 	if err != nil {
