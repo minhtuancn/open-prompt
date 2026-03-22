@@ -40,6 +40,11 @@ var (
 	ErrInternal           = &RPCError{Code: -32603, Message: "internal_error"}
 )
 
+// copyErr trả về bản sao của RPCError để tránh mutation của shared pointer
+func copyErr(e *RPCError) *RPCError {
+	return &RPCError{Code: e.Code, Message: e.Message}
+}
+
 // NewResponse tạo success response
 func NewResponse(id interface{}, result interface{}) Response {
 	return Response{JSONRPC: "2.0", Result: result, ID: id}

@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"runtime"
+	"strings"
 
 	"github.com/minhtuancn/open-prompt/go-engine/config"
 	"github.com/minhtuancn/open-prompt/go-engine/db"
@@ -27,13 +28,20 @@ func NewServer(secret string, database *db.DB) (*Server, error) {
 		secret: secret,
 		db:     database,
 	}
-	s.router = newRouter(s)
+	router, err := newRouter(s)
+	if err != nil {
+		return nil, fmt.Errorf("init router: %w", err)
+	}
+	s.router = router
 	return s, nil
 }
 
 // TestAddr tạo TCP listener trên random port và trả về addr (chỉ dùng cho test)
 func (s *Server) TestAddr() string {
-	ln, _ := net.Listen("tcp", "127.0.0.1:0")
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		panic(fmt.Sprintf("TestAddr: failed to create listener: %v", err))
+	}
 	s.listener = ln
 	return ln.Addr().String()
 }
@@ -52,7 +60,12 @@ func (s *Server) Listen() error {
 	for {
 		conn, err := s.listener.Accept()
 		if err != nil {
-			return nil // closed
+			// net.ErrClosed được trả về khi listener bị đóng có chủ ý
+			if strings.Contains(err.Error(), "use of closed") {
+				return nil
+			}
+			log.Printf("accept error: %v", err)
+			return err
 		}
 		go s.handleConn(conn)
 	}
@@ -75,8 +88,15 @@ func (s *Server) handleConn(conn net.Conn) {
 		line := scanner.Bytes()
 		resp := s.processMessage(conn, line)
 		if resp != nil {
-			data, _ := json.Marshal(resp)
-			conn.Write(append(data, '\n'))
+			data, err := json.Marshal(resp)
+			if err != nil {
+				log.Printf("marshal response: %v", err)
+				continue
+			}
+			if _, err := conn.Write(append(data, '\n')); err != nil {
+				log.Printf("write response: %v", err)
+				return
+			}
 		}
 	}
 }
@@ -89,12 +109,12 @@ func (s *Server) processMessage(conn net.Conn, data []byte) *Response {
 		Request Request `json:"request"`
 	}
 	if err := json.Unmarshal(data, &envelope); err != nil {
-		return &Response{JSONRPC: "2.0", Error: ErrInvalidParams}
+		return &Response{JSONRPC: "2.0", Error: copyErr(ErrInvalidParams)}
 	}
 
 	// Validate secret
 	if envelope.Secret != s.secret {
-		return &Response{JSONRPC: "2.0", Error: ErrUnauthorized, ID: envelope.Request.ID}
+		return &Response{JSONRPC: "2.0", Error: copyErr(ErrUnauthorized), ID: envelope.Request.ID}
 	}
 
 	// Dispatch

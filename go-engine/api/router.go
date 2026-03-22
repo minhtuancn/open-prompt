@@ -2,7 +2,6 @@ package api
 
 import (
 	"fmt"
-	"log"
 	"net"
 
 	"github.com/minhtuancn/open-prompt/go-engine/auth"
@@ -17,7 +16,7 @@ type Router struct {
 	settings *repos.SettingsRepo
 }
 
-func newRouter(s *Server) *Router {
+func newRouter(s *Server) (*Router, error) {
 	users := repos.NewUserRepo(s.db)
 	settings := repos.NewSettingsRepo(s.db)
 	// JWT secret — hardcoded for Phase 1, will use keychain in Phase 2
@@ -25,14 +24,14 @@ func newRouter(s *Server) *Router {
 	jwtSecret := "open-prompt-jwt-secret-v1-phase1"
 	authSvc, err := auth.NewService(users, jwtSecret)
 	if err != nil {
-		log.Fatalf("failed to create auth service: %v", err)
+		return nil, fmt.Errorf("create auth service: %w", err)
 	}
 	return &Router{
 		server:   s,
 		auth:     authSvc,
 		users:    users,
 		settings: settings,
-	}
+	}, nil
 }
 
 // dispatch gọi handler tương ứng với method
@@ -52,7 +51,7 @@ func (r *Router) dispatch(conn net.Conn, req *Request) (interface{}, *RPCError) 
 		return r.handleSettingsSet(req)
 	case "query.stream":
 		// Implemented in handlers_query.go (Task 6)
-		return nil, &RPCError{Code: -32601, Message: fmt.Sprintf("method not found: %s", req.Method)}
+		return nil, copyErr(ErrMethodNotFound)
 	default:
 		return nil, &RPCError{Code: -32601, Message: fmt.Sprintf("method not found: %s", req.Method)}
 	}

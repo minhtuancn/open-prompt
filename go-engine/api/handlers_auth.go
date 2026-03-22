@@ -18,7 +18,7 @@ type loginParams struct {
 func (r *Router) handleRegister(req *Request) (interface{}, *RPCError) {
 	var p registerParams
 	if err := decodeParams(req.Params, &p); err != nil {
-		return nil, ErrInvalidParams
+		return nil, copyErr(ErrInvalidParams)
 	}
 	user, err := r.auth.Register(p.Username, p.Password)
 	if err != nil {
@@ -33,7 +33,7 @@ func (r *Router) handleRegister(req *Request) (interface{}, *RPCError) {
 func (r *Router) handleLogin(req *Request) (interface{}, *RPCError) {
 	var p loginParams
 	if err := decodeParams(req.Params, &p); err != nil {
-		return nil, ErrInvalidParams
+		return nil, copyErr(ErrInvalidParams)
 	}
 	token, err := r.auth.Login(p.Username, p.Password)
 	if err != nil {
@@ -47,11 +47,11 @@ func (r *Router) handleMe(req *Request) (interface{}, *RPCError) {
 		Token string `json:"token"`
 	}
 	if err := decodeParams(req.Params, &p); err != nil {
-		return nil, ErrInvalidParams
+		return nil, copyErr(ErrInvalidParams)
 	}
 	claims, err := r.auth.ValidateToken(p.Token)
 	if err != nil {
-		return nil, ErrUnauthorized
+		return nil, copyErr(ErrUnauthorized)
 	}
 	return map[string]interface{}{
 		"user_id":  claims.UserID,
@@ -62,7 +62,7 @@ func (r *Router) handleMe(req *Request) (interface{}, *RPCError) {
 func (r *Router) handleIsFirstRun(req *Request) (interface{}, *RPCError) {
 	isFirst, err := r.auth.IsFirstRun()
 	if err != nil {
-		return nil, ErrInternal
+		return nil, copyErr(ErrInternal)
 	}
 	return map[string]bool{"is_first_run": isFirst}, nil
 }
@@ -73,15 +73,15 @@ func (r *Router) handleSettingsGet(req *Request) (interface{}, *RPCError) {
 		Key   string `json:"key"`
 	}
 	if err := decodeParams(req.Params, &p); err != nil {
-		return nil, ErrInvalidParams
+		return nil, copyErr(ErrInvalidParams)
 	}
 	claims, err := r.auth.ValidateToken(p.Token)
 	if err != nil {
-		return nil, ErrUnauthorized
+		return nil, copyErr(ErrUnauthorized)
 	}
 	value, err := r.settings.Get(claims.UserID, p.Key)
 	if err != nil {
-		return nil, ErrInternal
+		return nil, copyErr(ErrInternal)
 	}
 	return map[string]string{"value": value}, nil
 }
@@ -93,14 +93,14 @@ func (r *Router) handleSettingsSet(req *Request) (interface{}, *RPCError) {
 		Value string `json:"value"`
 	}
 	if err := decodeParams(req.Params, &p); err != nil {
-		return nil, ErrInvalidParams
+		return nil, copyErr(ErrInvalidParams)
 	}
 	claims, err := r.auth.ValidateToken(p.Token)
 	if err != nil {
-		return nil, ErrUnauthorized
+		return nil, copyErr(ErrUnauthorized)
 	}
 	if err := r.settings.Set(claims.UserID, p.Key, p.Value); err != nil {
-		return nil, ErrInternal
+		return nil, copyErr(ErrInternal)
 	}
 	return map[string]bool{"ok": true}, nil
 }
