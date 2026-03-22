@@ -50,8 +50,7 @@ func (r *Router) dispatch(conn net.Conn, req *Request) (interface{}, *RPCError) 
 	case "settings.set":
 		return r.handleSettingsSet(req)
 	case "query.stream":
-		// Implemented in handlers_query.go (Task 6)
-		return nil, copyErr(ErrMethodNotFound)
+		return r.handleQueryStream(conn, req)
 	default:
 		return nil, &RPCError{Code: -32601, Message: fmt.Sprintf("method not found: %s", req.Method)}
 	}
