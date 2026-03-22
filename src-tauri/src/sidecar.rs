@@ -10,7 +10,6 @@ pub struct SidecarState(pub Mutex<Option<Child>>);
 pub struct EngineSecret(pub String);
 
 /// EnginePort lưu TCP port (chỉ dùng trên Windows)
-#[allow(dead_code)]
 pub struct EnginePort(pub u16);
 
 /// Spawn Go engine sidecar và đợi "ready" signal từ stdout
@@ -42,7 +41,21 @@ pub fn spawn_engine(app: &AppHandle) -> Result<(), String> {
         .read_line(&mut line)
         .map_err(|e| format!("read stdout: {e}"))?;
 
-    if !line.trim().eq("ready") {
+    let trimmed = line.trim();
+
+    // Trên Windows Go engine gửi "ready:<addr>" để Tauri biết TCP port.
+    // Trên Unix gửi "ready" (path socket đã biết từ config).
+    if trimmed == "ready" {
+        // Unix: không cần port
+    } else if let Some(addr) = trimmed.strip_prefix("ready:") {
+        // Windows: parse port từ "ready:127.0.0.1:<port>"
+        let port: u16 = addr
+            .rsplit(':')
+            .next()
+            .and_then(|p| p.parse().ok())
+            .ok_or_else(|| format!("cannot parse port from engine output: {trimmed}"))?;
+        app.manage(EnginePort(port));
+    } else {
         return Err(format!("unexpected startup output: {line}"));
     }
 

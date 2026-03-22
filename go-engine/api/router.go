@@ -1,6 +1,9 @@
 package api
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"net"
 
@@ -19,9 +22,11 @@ type Router struct {
 func newRouter(s *Server) (*Router, error) {
 	users := repos.NewUserRepo(s.db)
 	settings := repos.NewSettingsRepo(s.db)
-	// JWT secret — hardcoded for Phase 1, will use keychain in Phase 2
-	// Must be at least 16 bytes per NewService validation
-	jwtSecret := "open-prompt-jwt-secret-v1-phase1"
+	// Derive JWT secret từ socket secret bằng HMAC-SHA256.
+	// Mỗi session có socket secret ngẫu nhiên → JWT secret cũng unique per-session.
+	mac := hmac.New(sha256.New, []byte(s.secret))
+	mac.Write([]byte("jwt-signing-key"))
+	jwtSecret := hex.EncodeToString(mac.Sum(nil))
 	authSvc, err := auth.NewService(users, jwtSecret)
 	if err != nil {
 		return nil, fmt.Errorf("create auth service: %w", err)

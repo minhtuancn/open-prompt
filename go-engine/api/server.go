@@ -36,6 +36,25 @@ func NewServer(secret string, database *db.DB) (*Server, error) {
 	return s, nil
 }
 
+// PrepareListener tạo listener trước khi Listen() được gọi.
+// Phải gọi trước Listen() để lấy Addr() (cần thiết trên Windows để biết port).
+func (s *Server) PrepareListener() error {
+	ln, err := createListener()
+	if err != nil {
+		return fmt.Errorf("create listener: %w", err)
+	}
+	s.listener = ln
+	return nil
+}
+
+// Addr trả về địa chỉ listener (chỉ hợp lệ sau PrepareListener hoặc TestAddr).
+func (s *Server) Addr() net.Addr {
+	if s.listener == nil {
+		return nil
+	}
+	return s.listener.Addr()
+}
+
 // TestAddr tạo TCP listener trên random port và trả về addr (chỉ dùng cho test)
 func (s *Server) TestAddr() string {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -46,14 +65,10 @@ func (s *Server) TestAddr() string {
 	return ln.Addr().String()
 }
 
-// Listen bắt đầu lắng nghe connections
+// Listen bắt đầu accept loop. Phải gọi PrepareListener() trước.
 func (s *Server) Listen() error {
 	if s.listener == nil {
-		var err error
-		s.listener, err = createListener()
-		if err != nil {
-			return fmt.Errorf("create listener: %w", err)
-		}
+		return fmt.Errorf("listener not prepared: call PrepareListener first")
 	}
 	log.Printf("listening on %s", s.listener.Addr())
 
