@@ -3,7 +3,6 @@ package model
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/minhtuancn/open-prompt/go-engine/model/providers"
 )
@@ -26,21 +25,10 @@ func (r *Router) RegisterAnthropic(apiKey string) {
 }
 
 // Stream gửi request và stream response qua callback
-func (r *Router) Stream(ctx context.Context, req CompletionRequest, onChunk func(string)) error {
+func (r *Router) Stream(ctx context.Context, req providers.CompletionRequest, onChunk func(string)) error {
 	p, ok := r.providers["anthropic"]
 	if !ok {
 		return fmt.Errorf("no provider configured")
 	}
-
-	start := time.Now()
-	err := p.StreamComplete(ctx, providers.CompletionRequest{
-		Model:       req.Model,
-		Prompt:      req.Prompt,
-		System:      req.System,
-		Temperature: req.Temperature,
-		MaxTokens:   req.MaxTokens,
-	}, onChunk)
-
-	_ = time.Since(start) // latency logging sẽ thêm ở Phase 2
-	return err
+	return p.StreamComplete(ctx, req, onChunk)
 }

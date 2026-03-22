@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/minhtuancn/open-prompt/go-engine/model"
+	"github.com/minhtuancn/open-prompt/go-engine/model/providers"
 )
 
 func (r *Router) handleQueryStream(conn net.Conn, req *Request) (interface{}, *RPCError) {
@@ -27,7 +29,7 @@ func (r *Router) handleQueryStream(conn net.Conn, req *Request) (interface{}, *R
 	// Lấy API key từ settings
 	apiKey, _ := r.settings.Get(claims.UserID, "anthropic_api_key")
 	if apiKey == "" {
-		return nil, &RPCError{Code: -32002, Message: "anthropic API key not configured"}
+		return nil, copyErr(ErrProviderNotFound)
 	}
 
 	// Build model router
@@ -40,8 +42,9 @@ func (r *Router) handleQueryStream(conn net.Conn, req *Request) (interface{}, *R
 	}
 
 	// Stream response qua JSON-RPC notifications
-	ctx := context.Background()
-	streamErr := modelRouter.Stream(ctx, model.CompletionRequest{
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	streamErr := modelRouter.Stream(ctx, providers.CompletionRequest{
 		Model:  modelName,
 		Prompt: p.Input,
 		System: p.System,

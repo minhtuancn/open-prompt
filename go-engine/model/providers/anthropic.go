@@ -87,6 +87,7 @@ func (p *AnthropicProvider) StreamComplete(ctx context.Context, req CompletionRe
 
 	// Parse Server-Sent Events
 	scanner := bufio.NewScanner(resp.Body)
+	scanner.Buffer(make([]byte, 1<<20), 1<<20) // 1MB buffer cho SSE events lớn
 	for scanner.Scan() {
 		line := scanner.Text()
 		if !strings.HasPrefix(line, "data: ") {
