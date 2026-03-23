@@ -63,7 +63,7 @@ func (r *Router) handleQueryStream(conn net.Conn, req *Request) (interface{}, *R
 
 	// Bắt đầu tính latency và thu thập chunks
 	start := time.Now()
-	var chunks []string
+	var sb strings.Builder
 
 	// Stream response qua JSON-RPC notifications
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
@@ -73,7 +73,7 @@ func (r *Router) handleQueryStream(conn net.Conn, req *Request) (interface{}, *R
 		Prompt: finalInput,
 		System: p.System,
 	}, func(chunk string) {
-		chunks = append(chunks, chunk)
+		sb.WriteString(chunk)
 		_ = SendNotification(conn, "stream.chunk", map[string]interface{}{
 			"delta": chunk,
 			"done":  false,
@@ -96,7 +96,7 @@ func (r *Router) handleQueryStream(conn net.Conn, req *Request) (interface{}, *R
 			Provider:  "anthropic",
 			Model:     modelName,
 			LatencyMs: latency,
-			Status:    "error",
+			Status:    repos.HistoryStatusError,
 		})
 		return nil, nil // notification đã gửi
 	}
@@ -111,12 +111,12 @@ func (r *Router) handleQueryStream(conn net.Conn, req *Request) (interface{}, *R
 	_ = r.history.Insert(repos.InsertHistoryInput{
 		UserID:    claims.UserID,
 		Query:     finalInput,
-		Response:  strings.Join(chunks, ""),
+		Response:  sb.String(),
 		// TODO: lấy provider thực từ model router khi hỗ trợ multi-provider
 		Provider:  "anthropic",
 		Model:     modelName,
 		LatencyMs: latency,
-		Status:    "success",
+		Status:    repos.HistoryStatusSuccess,
 	})
 
 	return nil, nil // response delivered via notifications

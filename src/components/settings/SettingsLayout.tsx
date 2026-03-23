@@ -33,20 +33,18 @@ const TABS: { id: Tab; label: string }[] = [
 
 export function SettingsLayout({ onClose }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('providers')
-  const [editingSkill, setEditingSkill] = useState<SkillData | undefined>()
-  const [isNewSkill, setIsNewSkill] = useState(false)
+  // null = list view, 'new' = creating, SkillData = editing
+  const [skillView, setSkillView] = useState<SkillData | 'new' | null>(null)
   const [skillRefresh, setSkillRefresh] = useState(0)
 
   const handleSkillSave = () => {
-    setEditingSkill(undefined)
-    setIsNewSkill(false)
+    setSkillView(null)
     setSkillRefresh((n) => n + 1)
   }
 
   const handleTabChange = (tab: Tab) => {
     setActiveTab(tab)
-    setEditingSkill(undefined)
-    setIsNewSkill(false)
+    setSkillView(null)
   }
 
   return (
@@ -71,16 +69,16 @@ export function SettingsLayout({ onClose }: Props) {
       <div className="flex-1 overflow-y-auto px-5 py-4">
         {activeTab === 'providers' && <ProvidersTab />}
         {activeTab === 'skills' && (
-          (editingSkill || isNewSkill) ? (
+          skillView !== null ? (
             <SkillEditor
-              skill={editingSkill}
+              skill={skillView === 'new' ? undefined : skillView}
               onSave={handleSkillSave}
-              onCancel={() => { setEditingSkill(undefined); setIsNewSkill(false) }}
+              onCancel={() => setSkillView(null)}
             />
           ) : (
             <SkillList
-              onEdit={(skill) => setEditingSkill(skill as SkillData)}
-              onNew={() => setIsNewSkill(true)}
+              onEdit={(skill) => setSkillView(skill as SkillData)}
+              onNew={() => setSkillView('new')}
               refreshSignal={skillRefresh}
             />
           )

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import type { Locale } from '../i18n'
 
-type Locale = 'vi' | 'en'
 type FontSize = 'sm' | 'base' | 'lg'
 
 interface SettingsState {

@@ -124,8 +124,6 @@ type UpdateSkillInput struct {
 	Tags       string
 }
 
-// Lưu ý: ConfigJSON được giữ trong UpdateSkillInput để nhất quán với CreateSkillInput và cột config_json trong DB.
-
 // Update cập nhật skill theo ID
 func (r *SkillRepo) Update(id int64, input UpdateSkillInput) error {
 	var promptID interface{}

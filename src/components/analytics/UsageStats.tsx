@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { callEngine } from '../../hooks/useEngine'
 import { useAuthStore } from '../../store/authStore'
 
@@ -44,7 +44,8 @@ export function UsageStats() {
       .finally(() => setLoading(false))
   }, [period, token])
 
-  const totalRequests = providers.reduce((sum, p) => sum + p.requests, 0)
+  const totalRequests = useMemo(() => providers.reduce((sum, p) => sum + p.requests, 0), [providers])
+  const top10 = summary.slice(0, 10)
 
   return (
     <div className="flex flex-col gap-4">
@@ -87,10 +88,10 @@ export function UsageStats() {
             </div>
           )}
 
-          {summary.slice(0, 10).length > 0 && (
+          {top10.length > 0 && (
             <div className="flex flex-col gap-1">
               <div className="text-xs text-white/40 mb-1">Theo ngày</div>
-              {summary.slice(0, 10).map((s, i) => (
+              {top10.map((s, i) => (
                 <div key={`${s.date}-${s.provider}-${s.model}-${i}`} className="flex items-center justify-between py-1.5 border-b border-white/5 last:border-0">
                   <div className="text-xs text-white/50 shrink-0">{s.date}</div>
                   <div className="text-xs text-white/30 mx-2 flex-1 truncate">{s.provider}/{s.model}</div>

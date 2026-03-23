@@ -13,12 +13,18 @@ import './styles/globals.css'
 
 type AppState = 'loading' | 'first-run' | 'login' | 'api-setup' | 'overlay' | 'settings'
 
+const FONT_SIZE_CLASS: Record<string, string> = {
+  sm: 'text-sm',
+  base: 'text-base',
+  lg: 'text-lg',
+}
+
 export default function App() {
   const [state, setState] = useState<AppState>('loading')
   const { token } = useAuthStore()
   const { reset, appendChunk, setStreaming, setError } = useOverlayStore()
   const fontSize = useSettingsStore((s) => s.fontSize)
-  const fontSizeClass = { sm: 'text-sm', base: 'text-base', lg: 'text-lg' }[fontSize]
+  const fontSizeClass = FONT_SIZE_CLASS[fontSize]
 
   useEffect(() => {
     async function init() {

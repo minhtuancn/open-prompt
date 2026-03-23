@@ -7,6 +7,14 @@ import (
 	"github.com/minhtuancn/open-prompt/go-engine/db"
 )
 
+// HistoryStatus là trạng thái của một history record
+type HistoryStatus string
+
+const (
+	HistoryStatusSuccess HistoryStatus = "success"
+	HistoryStatusError   HistoryStatus = "error"
+)
+
 // HistoryRepo xử lý ghi và truy vấn bảng history
 type HistoryRepo struct {
 	db *db.DB
@@ -25,14 +33,14 @@ type InsertHistoryInput struct {
 	Provider  string
 	Model     string
 	LatencyMs int64
-	Status    string // "success" | "error"
+	Status    HistoryStatus
 }
 
 // Insert ghi một bản ghi history mới
 func (r *HistoryRepo) Insert(input InsertHistoryInput) error {
 	status := input.Status
 	if status == "" {
-		status = "success"
+		status = HistoryStatusSuccess
 	}
 	// Định dạng timestamp theo chuẩn SQLite để date() và datetime() nhận diện đúng
 	now := time.Now().UTC().Format("2006-01-02 15:04:05")

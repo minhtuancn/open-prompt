@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { callEngine } from '../../hooks/useEngine'
 import { useAuthStore } from '../../store/authStore'
 
@@ -16,6 +16,9 @@ export function ProvidersTab() {
   const [saving, setSaving] = useState<Record<string, boolean>>({})
   const [saved, setSaved] = useState<Record<string, boolean>>({})
   const [error, setError] = useState<string>('')
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>()
+
+  useEffect(() => () => { if (timeoutRef.current) clearTimeout(timeoutRef.current) }, [])
 
   useEffect(() => {
     if (!token) return
@@ -31,7 +34,8 @@ export function ProvidersTab() {
       await callEngine('providers.connect', { token, provider_id: providerId, api_key: apiKeys[providerId]! })
       setSaved((p) => ({ ...p, [providerId]: true }))
       setProviders((prev) => prev.map((p) => p.id === providerId ? { ...p, connected: true } : p))
-      setTimeout(() => setSaved((p) => ({ ...p, [providerId]: false })), 2000)
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+      timeoutRef.current = setTimeout(() => setSaved((p) => ({ ...p, [providerId]: false })), 2000)
     } catch (e) {
       console.error(e)
     } finally {

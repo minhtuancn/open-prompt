@@ -1,7 +1,7 @@
 import vi from './locales/vi.json'
 import en from './locales/en.json'
 
-type Locale = 'vi' | 'en'
+export type Locale = 'vi' | 'en'
 
 const locales: Record<Locale, Record<string, string>> = { vi, en }
 
