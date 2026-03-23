@@ -17,11 +17,13 @@ type Router struct {
 	auth     *auth.Service
 	users    *repos.UserRepo
 	settings *repos.SettingsRepo
+	prompts  *repos.PromptRepo
 }
 
 func newRouter(s *Server) (*Router, error) {
 	users := repos.NewUserRepo(s.db)
 	settings := repos.NewSettingsRepo(s.db)
+	prompts := repos.NewPromptRepo(s.db)
 	// Derive JWT secret từ socket secret bằng HMAC-SHA256.
 	// Mỗi session có socket secret ngẫu nhiên → JWT secret cũng unique per-session.
 	mac := hmac.New(sha256.New, []byte(s.secret))
@@ -36,6 +38,7 @@ func newRouter(s *Server) (*Router, error) {
 		auth:     authSvc,
 		users:    users,
 		settings: settings,
+		prompts:  prompts,
 	}, nil
 }
 
@@ -64,6 +67,18 @@ func (r *Router) dispatch(conn net.Conn, req *Request) (interface{}, *RPCError) 
 		return r.handleProvidersConnect(req)
 	case "providers.set_priority":
 		return r.handleProvidersSetPriority(req)
+	case "prompts.list":
+		return r.handlePromptsList(req)
+	case "prompts.create":
+		return r.handlePromptsCreate(req)
+	case "prompts.update":
+		return r.handlePromptsUpdate(req)
+	case "prompts.delete":
+		return r.handlePromptsDelete(req)
+	case "commands.list":
+		return r.handleCommandsList(req)
+	case "commands.resolve":
+		return r.handleCommandsResolve(req)
 	default:
 		return nil, &RPCError{Code: -32601, Message: fmt.Sprintf("method not found: %s", req.Method)}
 	}
