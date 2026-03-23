@@ -1,0 +1,57 @@
+# Changelog
+
+## [0.2.0] - 2026-03-23
+
+### Phase 2A: Multi-Provider Engine
+- **Provider Interface** — interface chuẩn cho tất cả AI providers
+- **6 Providers** — Anthropic, OpenAI, Ollama, Gemini, Copilot, Gateway
+- **ProviderRegistry** — Route, Default, FallbackCandidates
+- **@Mention Routing** — `@claude`, `@gpt4`, `@gemini`, etc
+- **ParseMention** — tách alias từ prompt
+- **Auto-detect** — env vars, CLI (gh auth token), localport scanning
+- **Auto-register** — providers từ DB tokens + env vars khi khởi động
+- **3 API handlers** — add_gateway, validate, remove
+- **Gateway Presets** — Ollama, LiteLLM, OpenRouter, vLLM
+
+### Phase 2A3: Frontend Multi-Provider
+- **ModelPicker** — Ctrl+M quick-switch với keyboard navigation
+- **MentionHint** — @mention dropdown gợi ý providers
+- **FallbackDialog** — interactive retry khi provider fail
+- **GatewayForm** — preset templates cho gateway
+- **overlayStore** — activeProvider, activeModel, fallbackProviders
+
+### Phase 2B: OAuth + Prompt Library
+- **History API** — history.list, history.search với pagination
+- **HistoryPanel** — browse + search history
+- **Prompts Tab** — PromptList/PromptEditor wired vào Settings
+- **OAuth handlers** — PKCE, Device Flow placeholders
+- **Settings 8 tabs** — Providers, Prompts, Skills, History, Hotkey, Appearance, Language, Analytics
+
+### Phase 2C: Text Injection
+- **Clipboard backup/restore** — không mất data user
+- **Smart injection** — terminal → typing, non-terminal → clipboard
+- **Copy button** — ngoài Insert
+- **Wayland support** — swaymsg (Sway), hyprctl (Hyprland)
+- **App name feedback** — hiện tên app đã inject
+
+### Phase 3-7: Completion
+- **Conversations** — multi-turn chat với messages table
+- **i18n 7 ngôn ngữ** — fr, zh-CN, th, lo, ru
+- **Health Checker** — ping providers mỗi 5 phút
+- **Build scripts** — cross-compile, dev, release
+- **Documentation** — README, CHANGELOG, ROADMAP
+
+## [0.1.0] - 2026-03-22
+
+### Phase 1: Foundation
+- Tauri v2 shell — hotkey, window, system tray
+- Go Engine sidecar — JSON-RPC 2.0 qua Unix socket
+- Auth — bcrypt + JWT multi-user
+- SQLite database — migrations, repos
+- Overlay UI — CommandInput, ResponsePanel, SlashMenu
+- Streaming — SSE from Anthropic API
+- Settings — 6 tabs (Providers, Skills, Hotkey, Appearance, Language, Analytics)
+- Skills/Analytics API + UI
+- i18n — vi/en
+- Text injection — clipboard + enigo
+- CI/CD — GitHub Actions build workflow
