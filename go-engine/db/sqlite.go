@@ -33,6 +33,11 @@ func OpenInMemory() (*DB, error) {
 	return openPath(":memory:")
 }
 
+// OpenPath mở SQLite database tại path chỉ định (dùng cho test)
+func OpenPath(path string) (*DB, error) {
+	return openPath(path)
+}
+
 func openPath(path string) (*DB, error) {
 	dsn := path
 	if path != ":memory:" {
