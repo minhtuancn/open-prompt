@@ -1,6 +1,21 @@
 package api
 
-import "fmt"
+import (
+	"fmt"
+	"regexp"
+)
+
+// htmlTagRegex strip HTML tags từ input
+var htmlTagRegex = regexp.MustCompile(`<[^>]*>`)
+
+// sanitizeMarketplaceText loại bỏ HTML tags và giới hạn độ dài
+func sanitizeMarketplaceText(s string, maxLen int) string {
+	s = htmlTagRegex.ReplaceAllString(s, "")
+	if len(s) > maxLen {
+		s = s[:maxLen]
+	}
+	return s
+}
 
 // handleMarketplaceList trả về danh sách public prompts
 func (r *Router) handleMarketplaceList(req *Request) (interface{}, *RPCError) {
@@ -72,6 +87,13 @@ func (r *Router) handleMarketplacePublish(req *Request) (interface{}, *RPCError)
 	if p.Title == "" || p.Content == "" {
 		return nil, &RPCError{Code: ErrInvalidParams.Code, Message: "title and content are required"}
 	}
+
+	// Sanitize input — strip HTML, giới hạn size (chống XSS + DB bloat)
+	p.Title = sanitizeMarketplaceText(p.Title, 200)
+	p.Content = sanitizeMarketplaceText(p.Content, 50000)
+	p.Description = sanitizeMarketplaceText(p.Description, 1000)
+	p.Category = sanitizeMarketplaceText(p.Category, 50)
+	p.Tags = sanitizeMarketplaceText(p.Tags, 200)
 
 	id, err := r.marketplace.Publish(claims.UserID, p.Title, p.Content, p.Description, p.Category, p.Tags)
 	if err != nil {

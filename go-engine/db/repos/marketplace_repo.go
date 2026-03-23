@@ -1,6 +1,8 @@
 package repos
 
 import (
+	"strings"
+
 	"github.com/minhtuancn/open-prompt/go-engine/db"
 )
 
@@ -58,16 +60,27 @@ func (r *MarketplaceRepo) List(limit, offset int) ([]SharedPrompt, error) {
 	return result, nil
 }
 
+// sanitizeLikePattern escape LIKE wildcards để tránh DoS/timing attacks
+func sanitizeLikePattern(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `%`, `\%`)
+	s = strings.ReplaceAll(s, `_`, `\_`)
+	if len(s) > 100 {
+		s = s[:100]
+	}
+	return s
+}
+
 // Search tìm prompts theo keyword
 func (r *MarketplaceRepo) Search(query string, limit int) ([]SharedPrompt, error) {
 	if limit <= 0 {
 		limit = 50
 	}
-	like := "%" + query + "%"
+	like := "%" + sanitizeLikePattern(query) + "%"
 	rows, err := r.db.Query(`
 		SELECT id, user_id, title, content, COALESCE(description,''), COALESCE(category,''), COALESCE(tags,''), downloads, is_public, created_at
 		FROM shared_prompts
-		WHERE is_public = 1 AND (title LIKE ? OR description LIKE ? OR tags LIKE ?)
+		WHERE is_public = 1 AND (title LIKE ? ESCAPE '\' OR description LIKE ? ESCAPE '\' OR tags LIKE ? ESCAPE '\')
 		ORDER BY downloads DESC
 		LIMIT ?
 	`, like, like, like, limit)

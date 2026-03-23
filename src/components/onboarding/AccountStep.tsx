@@ -20,6 +20,10 @@ export function AccountStep({ onNext }: Props) {
       setError('Mật khẩu cần ít nhất 8 ký tự')
       return
     }
+    if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
+      setError('Mật khẩu phải chứa chữ hoa, chữ thường và số')
+      return
+    }
     setLoading(true)
     setError('')
     try {

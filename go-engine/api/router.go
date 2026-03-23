@@ -32,6 +32,7 @@ type Router struct {
 	healthChecker    *provider.HealthChecker
 	plugins          *repos.PluginRepo
 	marketplace      *repos.MarketplaceRepo
+	rateLimiter      *RateLimiter
 }
 
 func newRouter(s *Server) (*Router, error) {
@@ -87,11 +88,18 @@ func newRouter(s *Server) (*Router, error) {
 		healthChecker:    hc,
 		plugins:          pluginRepo,
 		marketplace:      marketplaceRepo,
+		rateLimiter:      NewRateLimiter(),
 	}, nil
 }
 
 // dispatch gọi handler tương ứng với method
 func (r *Router) dispatch(conn net.Conn, req *Request) (interface{}, *RPCError) {
+	// Rate limiting — dùng remote address làm caller identifier
+	caller := conn.RemoteAddr().String()
+	if !r.rateLimiter.Allow(req.Method, caller) {
+		return nil, &RPCError{Code: -32003, Message: "rate limit exceeded, vui lòng thử lại sau"}
+	}
+
 	switch req.Method {
 	case "auth.register":
 		return r.handleRegister(req)

@@ -86,7 +86,8 @@ func (r *Router) handlePromptsUpdate(req *Request) (interface{}, *RPCError) {
 	if err := decodeParams(req.Params, &p); err != nil {
 		return nil, copyErr(ErrInvalidParams)
 	}
-	if _, err := r.auth.ValidateToken(p.Token); err != nil {
+	claims, err := r.auth.ValidateToken(p.Token)
+	if err != nil {
 		return nil, copyErr(ErrUnauthorized)
 	}
 	if p.ID == 0 || p.Title == "" || p.Content == "" {
@@ -94,6 +95,15 @@ func (r *Router) handlePromptsUpdate(req *Request) (interface{}, *RPCError) {
 	}
 	if p.IsSlash && !slashNameRegex.MatchString(p.SlashName) {
 		return nil, &RPCError{Code: -32602, Message: "slash_name không hợp lệ"}
+	}
+
+	// Kiểm tra ownership — chống IDOR
+	existing, err := r.prompts.FindByID(p.ID)
+	if err != nil || existing == nil {
+		return nil, &RPCError{Code: -32602, Message: "prompt không tồn tại"}
+	}
+	if existing.UserID != claims.UserID {
+		return nil, &RPCError{Code: -32001, Message: "không có quyền truy cập prompt này"}
 	}
 
 	// Update trả về error, sau đó lấy prompt mới nhất bằng FindByID
@@ -123,12 +133,23 @@ func (r *Router) handlePromptsDelete(req *Request) (interface{}, *RPCError) {
 	if err := decodeParams(req.Params, &p); err != nil {
 		return nil, copyErr(ErrInvalidParams)
 	}
-	if _, err := r.auth.ValidateToken(p.Token); err != nil {
+	claims, err := r.auth.ValidateToken(p.Token)
+	if err != nil {
 		return nil, copyErr(ErrUnauthorized)
 	}
 	if p.ID == 0 {
 		return nil, copyErr(ErrInvalidParams)
 	}
+
+	// Kiểm tra ownership — chống IDOR
+	existing, err := r.prompts.FindByID(p.ID)
+	if err != nil || existing == nil {
+		return nil, &RPCError{Code: -32602, Message: "prompt không tồn tại"}
+	}
+	if existing.UserID != claims.UserID {
+		return nil, &RPCError{Code: -32001, Message: "không có quyền xóa prompt này"}
+	}
+
 	if err := r.prompts.Delete(p.ID); err != nil {
 		return nil, copyErr(ErrInternal)
 	}
