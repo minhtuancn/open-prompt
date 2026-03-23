@@ -64,7 +64,7 @@ func (r *Router) handleSkillsCreate(req *Request) (interface{}, *RPCError) {
 
 // handleSkillsUpdate cập nhật skill
 func (r *Router) handleSkillsUpdate(req *Request) (interface{}, *RPCError) {
-	_, rpcErr := r.requireAuth(req)
+	claims, rpcErr := r.requireAuth(req)
 	if rpcErr != nil {
 		return nil, rpcErr
 	}
@@ -79,6 +79,17 @@ func (r *Router) handleSkillsUpdate(req *Request) (interface{}, *RPCError) {
 	}
 	if err := decodeParams(req.Params, &p); err != nil || p.ID == 0 || p.Name == "" {
 		return nil, copyErr(ErrInvalidParams)
+	}
+	// Kiểm tra quyền sở hữu: chỉ chủ sở hữu mới được cập nhật skill
+	existing, err := r.skills.FindByID(p.ID)
+	if err != nil {
+		return nil, copyErr(ErrInternal)
+	}
+	if existing == nil {
+		return nil, copyErr(ErrInvalidParams)
+	}
+	if existing.UserID != claims.UserID {
+		return nil, copyErr(ErrForbidden)
 	}
 	if err := r.skills.Update(p.ID, repos.UpdateSkillInput{
 		Name: p.Name, PromptText: p.PromptText,
@@ -98,7 +109,7 @@ func (r *Router) handleSkillsUpdate(req *Request) (interface{}, *RPCError) {
 
 // handleSkillsDelete xóa skill
 func (r *Router) handleSkillsDelete(req *Request) (interface{}, *RPCError) {
-	_, rpcErr := r.requireAuth(req)
+	claims, rpcErr := r.requireAuth(req)
 	if rpcErr != nil {
 		return nil, rpcErr
 	}
@@ -108,6 +119,17 @@ func (r *Router) handleSkillsDelete(req *Request) (interface{}, *RPCError) {
 	}
 	if err := decodeParams(req.Params, &p); err != nil || p.ID == 0 {
 		return nil, copyErr(ErrInvalidParams)
+	}
+	// Kiểm tra quyền sở hữu: chỉ chủ sở hữu mới được xóa skill
+	existing, err := r.skills.FindByID(p.ID)
+	if err != nil {
+		return nil, copyErr(ErrInternal)
+	}
+	if existing == nil {
+		return nil, copyErr(ErrInvalidParams)
+	}
+	if existing.UserID != claims.UserID {
+		return nil, copyErr(ErrForbidden)
 	}
 	if err := r.skills.Delete(p.ID); err != nil {
 		return nil, copyErr(ErrInternal)

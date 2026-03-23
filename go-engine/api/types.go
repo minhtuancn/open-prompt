@@ -35,6 +35,7 @@ var (
 	ErrUnauthorized       = &RPCError{Code: -32001, Message: "unauthorized"}
 	ErrProviderNotFound   = &RPCError{Code: -32002, Message: "provider_not_found"}
 	ErrAllProvidersFailed = &RPCError{Code: -32003, Message: "all_providers_failed"}
+	ErrForbidden          = &RPCError{Code: -32004, Message: "forbidden"}
 	ErrMethodNotFound     = &RPCError{Code: -32601, Message: "method_not_found"}
 	ErrInvalidParams      = &RPCError{Code: -32602, Message: "invalid_params"}
 	ErrInternal           = &RPCError{Code: -32603, Message: "internal_error"}
