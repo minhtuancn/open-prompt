@@ -9,8 +9,9 @@ import { UsageStats } from '../analytics/UsageStats'
 import { PromptList } from '../prompts/PromptList'
 import { PromptEditor } from '../prompts/PromptEditor'
 import { HistoryPanel } from '../history/HistoryPanel'
+import { UpdateTab } from './UpdateTab'
 
-type Tab = 'providers' | 'prompts' | 'skills' | 'history' | 'hotkey' | 'appearance' | 'language' | 'analytics'
+type Tab = 'providers' | 'prompts' | 'skills' | 'history' | 'hotkey' | 'appearance' | 'language' | 'analytics' | 'update'
 
 interface SkillData {
   id?: number
@@ -34,6 +35,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'appearance', label: 'Giao diện' },
   { id: 'language', label: 'Ngôn ngữ' },
   { id: 'analytics', label: 'Thống kê' },
+  { id: 'update', label: 'Cập nhật' },
 ]
 
 export function SettingsLayout({ onClose }: Props) {
@@ -114,6 +116,7 @@ export function SettingsLayout({ onClose }: Props) {
         {activeTab === 'appearance' && <AppearanceTab />}
         {activeTab === 'language' && <LanguageTab />}
         {activeTab === 'analytics' && <UsageStats />}
+        {activeTab === 'update' && <UpdateTab />}
       </div>
     </div>
   )

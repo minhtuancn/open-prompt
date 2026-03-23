@@ -34,6 +34,12 @@
       "iconAsTemplate": true
     }
   },
+  "plugins": {
+    "updater": {
+      "endpoints": ["https://github.com/minhtuancn/open-prompt-release/releases/latest/download/update-manifest.json"],
+      "pubkey": ""
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",
