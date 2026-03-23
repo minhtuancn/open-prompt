@@ -6,8 +6,11 @@ import { LanguageTab } from './LanguageTab'
 import { SkillList } from '../skills/SkillList'
 import { SkillEditor } from '../skills/SkillEditor'
 import { UsageStats } from '../analytics/UsageStats'
+import { PromptList } from '../prompts/PromptList'
+import { PromptEditor } from '../prompts/PromptEditor'
+import { HistoryPanel } from '../history/HistoryPanel'
 
-type Tab = 'providers' | 'skills' | 'hotkey' | 'appearance' | 'language' | 'analytics'
+type Tab = 'providers' | 'prompts' | 'skills' | 'history' | 'hotkey' | 'appearance' | 'language' | 'analytics'
 
 interface SkillData {
   id?: number
@@ -24,7 +27,9 @@ interface Props {
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'providers', label: 'Providers' },
+  { id: 'prompts', label: 'Prompts' },
   { id: 'skills', label: 'Skills' },
+  { id: 'history', label: 'Lịch sử' },
   { id: 'hotkey', label: 'Phím tắt' },
   { id: 'appearance', label: 'Giao diện' },
   { id: 'language', label: 'Ngôn ngữ' },
@@ -33,18 +38,25 @@ const TABS: { id: Tab; label: string }[] = [
 
 export function SettingsLayout({ onClose }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('providers')
-  // null = list view, 'new' = creating, SkillData = editing
   const [skillView, setSkillView] = useState<SkillData | 'new' | null>(null)
   const [skillRefresh, setSkillRefresh] = useState(0)
+  const [promptView, setPromptView] = useState<any | 'new' | null>(null)
+  const [promptRefresh, setPromptRefresh] = useState(0)
 
   const handleSkillSave = () => {
     setSkillView(null)
     setSkillRefresh((n) => n + 1)
   }
 
+  const handlePromptSave = () => {
+    setPromptView(null)
+    setPromptRefresh((n) => n + 1)
+  }
+
   const handleTabChange = (tab: Tab) => {
     setActiveTab(tab)
     setSkillView(null)
+    setPromptView(null)
   }
 
   return (
@@ -68,6 +80,21 @@ export function SettingsLayout({ onClose }: Props) {
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
         {activeTab === 'providers' && <ProvidersTab />}
+        {activeTab === 'prompts' && (
+          promptView !== null ? (
+            <PromptEditor
+              initial={promptView === 'new' ? undefined : promptView}
+              onSave={(_p: unknown) => handlePromptSave()}
+              onCancel={() => setPromptView(null)}
+            />
+          ) : (
+            <PromptList
+              onEdit={(prompt) => setPromptView(prompt)}
+              key={promptRefresh}
+            />
+          )
+        )}
+        {activeTab === 'history' && <HistoryPanel />}
         {activeTab === 'skills' && (
           skillView !== null ? (
             <SkillEditor
