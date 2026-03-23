@@ -1,6 +1,7 @@
 mod hotkey;
 mod injection;
 mod ipc;
+mod oauth;
 mod sidecar;
 mod tray;
 mod window;
@@ -17,6 +18,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             ipc::call_engine,
             injection::inject_text,
+            oauth::start_oauth,
+            oauth::poll_oauth,
         ])
         .setup(|app| {
             sidecar::spawn_engine(app.handle())
