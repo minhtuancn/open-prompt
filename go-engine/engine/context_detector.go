@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"os"
 	"os/exec"
 	"runtime"
 	"strconv"
@@ -25,10 +26,12 @@ var terminalApps = map[string]bool{
 	"xfce4-terminal":  true,
 	"konsole":         true,
 	"tilix":           true,
-	"wt":              true, // Windows Terminal
+	"wt":              true,
 	"WindowsTerminal": true,
 	"iTerm2":          true,
 	"Terminal":        true,
+	"wezterm":         true,
+	"foot":            true,
 	"bash":            true,
 	"zsh":             true,
 	"fish":            true,
@@ -48,9 +51,14 @@ func IsTerminalApp(appName string) bool {
 func GetActiveWindow() *WindowInfo {
 	switch runtime.GOOS {
 	case "linux":
+		// Thử Wayland trước (nếu WAYLAND_DISPLAY có set)
+		if os.Getenv("WAYLAND_DISPLAY") != "" {
+			if info := getActiveWindowWayland(); info.AppName != "" {
+				return info
+			}
+		}
 		return getActiveWindowLinux()
 	default:
-		// Stub cho macOS và Windows — implement ở phase sau
 		return &WindowInfo{}
 	}
 }
@@ -108,5 +116,61 @@ func getActiveWindowLinux() *WindowInfo {
 	}
 
 	info.IsTerminal = IsTerminalApp(info.AppName)
+	return info
+}
+
+// getActiveWindowWayland detect active window trên Wayland qua swaymsg hoặc hyprctl
+func getActiveWindowWayland() *WindowInfo {
+	info := &WindowInfo{}
+
+	// Thử swaymsg (Sway compositor)
+	if out, err := exec.Command("swaymsg", "-t", "get_tree").Output(); err == nil {
+		s := string(out)
+		// Parse focused window từ JSON tree — tìm "focused": true
+		if idx := strings.Index(s, `"focused":true`); idx >= 0 {
+			// Tìm "app_id" gần nhất trước focused
+			before := s[:idx]
+			if appIdx := strings.LastIndex(before, `"app_id":"`); appIdx >= 0 {
+				start := appIdx + len(`"app_id":"`)
+				end := strings.Index(before[start:], `"`)
+				if end > 0 {
+					info.AppName = before[start : start+end]
+				}
+			}
+			// Tìm "name" gần nhất trước focused
+			if nameIdx := strings.LastIndex(before, `"name":"`); nameIdx >= 0 {
+				start := nameIdx + len(`"name":"`)
+				end := strings.Index(before[start:], `"`)
+				if end > 0 {
+					info.WindowTitle = before[start : start+end]
+				}
+			}
+		}
+		info.IsTerminal = IsTerminalApp(info.AppName)
+		return info
+	}
+
+	// Thử hyprctl (Hyprland compositor)
+	if out, err := exec.Command("hyprctl", "activewindow", "-j").Output(); err == nil {
+		s := string(out)
+		// Parse "class": "appname" từ JSON
+		if classIdx := strings.Index(s, `"class":"`); classIdx >= 0 {
+			start := classIdx + len(`"class":"`)
+			end := strings.Index(s[start:], `"`)
+			if end > 0 {
+				info.AppName = s[start : start+end]
+			}
+		}
+		if titleIdx := strings.Index(s, `"title":"`); titleIdx >= 0 {
+			start := titleIdx + len(`"title":"`)
+			end := strings.Index(s[start:], `"`)
+			if end > 0 {
+				info.WindowTitle = s[start : start+end]
+			}
+		}
+		info.IsTerminal = IsTerminalApp(info.AppName)
+		return info
+	}
+
 	return info
 }

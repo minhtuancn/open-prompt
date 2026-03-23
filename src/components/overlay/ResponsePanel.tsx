@@ -10,6 +10,8 @@ export function ResponsePanel() {
   const [isInjecting, setIsInjecting] = useState(false)
   const [injectError, setInjectError] = useState<string | null>(null)
   const [injected, setInjected] = useState(false)
+  const [injectedApp, setInjectedApp] = useState('')
+  const [copied, setCopied] = useState(false)
   const injectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -26,13 +28,32 @@ export function ResponsePanel() {
     setInjectError(null)
     setInjected(false)
     try {
-      await invoke('inject_text', { text })
+      const appName = await invoke<string>('inject_text', { text })
       setInjected(true)
-      injectTimerRef.current = setTimeout(() => setInjected(false), 2000)
+      setInjectedApp(appName || '')
+      injectTimerRef.current = setTimeout(() => { setInjected(false); setInjectedApp('') }, 3000)
     } catch (err) {
       setInjectError(err as string)
     } finally {
       setIsInjecting(false)
+    }
+  }
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Fallback cho khi clipboard API không available
+      const textarea = document.createElement('textarea')
+      textarea.value = text
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
     }
   }
 
@@ -79,18 +100,23 @@ export function ResponsePanel() {
                   title="Chèn text vào ứng dụng đang focus"
                 >
                   {isInjecting ? (
-                    <>
-                      <span className="animate-spin">⟳</span>
-                      <span>Đang chèn...</span>
-                    </>
+                    <><span className="animate-spin">⟳</span><span>Đang chèn...</span></>
                   ) : injected ? (
-                    <>
-                      <span>✓</span>
-                      <span>Đã chèn</span>
-                    </>
+                    <><span>✓</span><span>Đã chèn{injectedApp ? ` → ${injectedApp}` : ''}</span></>
                   ) : (
                     <span>Insert ↵</span>
                   )}
+                </button>
+
+                <button
+                  onClick={handleCopy}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 ${
+                    copied
+                      ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                      : 'bg-white/5 text-white/40 border border-white/10 hover:bg-white/10 hover:text-white/70'
+                  }`}
+                >
+                  {copied ? '✓ Copied' : 'Copy'}
                 </button>
 
                 {injectError && (
