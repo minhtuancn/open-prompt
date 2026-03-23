@@ -125,6 +125,10 @@ func (r *Router) dispatch(conn net.Conn, req *Request) (interface{}, *RPCError) 
 		return r.handleProvidersValidate(req)
 	case "providers.remove":
 		return r.handleProvidersRemove(req)
+	case "history.list":
+		return r.handleHistoryList(req)
+	case "history.search":
+		return r.handleHistorySearch(req)
 	default:
 		return nil, &RPCError{Code: -32601, Message: fmt.Sprintf("method not found: %s", req.Method)}
 	}

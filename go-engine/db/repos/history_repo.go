@@ -133,3 +133,72 @@ func (r *HistoryRepo) TotalsByProvider(userID int64, days int) ([]ProviderTotals
 	}
 	return result, rows.Err()
 }
+
+// HistoryEntry là một bản ghi history đầy đủ
+type HistoryEntry struct {
+	ID        int64  `json:"id"`
+	Query     string `json:"query"`
+	Response  string `json:"response"`
+	Provider  string `json:"provider"`
+	Model     string `json:"model"`
+	LatencyMs int64  `json:"latency_ms"`
+	Status    string `json:"status"`
+	Timestamp string `json:"timestamp"`
+}
+
+// List trả về history entries với pagination
+func (r *HistoryRepo) List(userID int64, limit, offset int) ([]HistoryEntry, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	rows, err := r.db.Query(
+		`SELECT id, query, COALESCE(response,''), COALESCE(provider,''), COALESCE(model,''),
+		        COALESCE(latency_ms,0), COALESCE(status,'success'), timestamp
+		 FROM history WHERE user_id = ?
+		 ORDER BY timestamp DESC LIMIT ? OFFSET ?`,
+		userID, limit, offset,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list history: %w", err)
+	}
+	defer rows.Close()
+
+	var result []HistoryEntry
+	for rows.Next() {
+		var e HistoryEntry
+		if err := rows.Scan(&e.ID, &e.Query, &e.Response, &e.Provider, &e.Model, &e.LatencyMs, &e.Status, &e.Timestamp); err != nil {
+			return nil, fmt.Errorf("scan history: %w", err)
+		}
+		result = append(result, e)
+	}
+	return result, rows.Err()
+}
+
+// Search tìm history theo query text
+func (r *HistoryRepo) Search(userID int64, search string, limit int) ([]HistoryEntry, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	pattern := "%" + search + "%"
+	rows, err := r.db.Query(
+		`SELECT id, query, COALESCE(response,''), COALESCE(provider,''), COALESCE(model,''),
+		        COALESCE(latency_ms,0), COALESCE(status,'success'), timestamp
+		 FROM history WHERE user_id = ? AND (query LIKE ? OR response LIKE ?)
+		 ORDER BY timestamp DESC LIMIT ?`,
+		userID, pattern, pattern, limit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("search history: %w", err)
+	}
+	defer rows.Close()
+
+	var result []HistoryEntry
+	for rows.Next() {
+		var e HistoryEntry
+		if err := rows.Scan(&e.ID, &e.Query, &e.Response, &e.Provider, &e.Model, &e.LatencyMs, &e.Status, &e.Timestamp); err != nil {
+			return nil, fmt.Errorf("scan history: %w", err)
+		}
+		result = append(result, e)
+	}
+	return result, rows.Err()
+}
