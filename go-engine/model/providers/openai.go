@@ -105,3 +105,40 @@ func (p *OpenAIProvider) StreamComplete(ctx context.Context, req CompletionReque
 	}
 	return scanner.Err()
 }
+
+// Name trả về tên chính
+func (p *OpenAIProvider) Name() string { return "openai" }
+
+// DisplayName trả về tên hiển thị
+func (p *OpenAIProvider) DisplayName() string { return "OpenAI (ChatGPT)" }
+
+// Aliases trả về tất cả alias
+func (p *OpenAIProvider) Aliases() []string {
+	return []string{"gpt4", "gpt", "openai", "o1", "o3", "codex"}
+}
+
+// GetAuthType trả về loại xác thực
+func (p *OpenAIProvider) GetAuthType() AuthType { return AuthAPIKey }
+
+// Validate kiểm tra API key
+func (p *OpenAIProvider) Validate(ctx context.Context) error {
+	req, err := http.NewRequestWithContext(ctx, "GET", p.baseURL+"/models", nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+p.apiKey)
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("openai validate: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("openai validate: HTTP %d", resp.StatusCode)
+	}
+	return nil
+}
+
+// Models trả về danh sách model IDs (hardcode)
+func (p *OpenAIProvider) Models(_ context.Context) ([]string, error) {
+	return []string{"gpt-4o", "gpt-4o-mini", "o1", "o3-mini"}, nil
+}

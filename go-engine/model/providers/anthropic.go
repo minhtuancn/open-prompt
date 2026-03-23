@@ -121,3 +121,46 @@ func (p *AnthropicProvider) StreamComplete(ctx context.Context, req CompletionRe
 	}
 	return scanner.Err()
 }
+
+// Name trả về tên chính (khớp DB key)
+func (p *AnthropicProvider) Name() string { return "anthropic" }
+
+// DisplayName trả về tên hiển thị
+func (p *AnthropicProvider) DisplayName() string { return "Anthropic (Claude)" }
+
+// Aliases trả về tất cả alias cho @mention routing
+func (p *AnthropicProvider) Aliases() []string {
+	return []string{"claude", "sonnet", "opus", "haiku", "anthropic"}
+}
+
+// GetAuthType trả về loại xác thực
+func (p *AnthropicProvider) GetAuthType() AuthType { return AuthAPIKey }
+
+// Validate kiểm tra API key hợp lệ
+func (p *AnthropicProvider) Validate(ctx context.Context) error {
+	req, err := http.NewRequestWithContext(ctx, "GET", p.baseURL+"/models", nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("x-api-key", p.apiKey)
+	req.Header.Set("anthropic-version", anthropicVersion)
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("anthropic validate: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("anthropic validate: HTTP %d", resp.StatusCode)
+	}
+	return nil
+}
+
+// Models trả về danh sách model IDs (hardcode — ít thay đổi)
+func (p *AnthropicProvider) Models(_ context.Context) ([]string, error) {
+	return []string{
+		"claude-sonnet-4-5-20250514",
+		"claude-3-5-sonnet-20241022",
+		"claude-3-5-haiku-20241022",
+		"claude-opus-4-5",
+	}, nil
+}

@@ -101,3 +101,60 @@ func (p *OllamaProvider) StreamComplete(ctx context.Context, req CompletionReque
 	}
 	return scanner.Err()
 }
+
+// Name trả về tên chính
+func (p *OllamaProvider) Name() string { return "ollama" }
+
+// DisplayName trả về tên hiển thị
+func (p *OllamaProvider) DisplayName() string { return "Ollama (Local)" }
+
+// Aliases trả về tất cả alias
+func (p *OllamaProvider) Aliases() []string {
+	return []string{"ollama", "local", "llama"}
+}
+
+// GetAuthType trả về loại xác thực
+func (p *OllamaProvider) GetAuthType() AuthType { return AuthNone }
+
+// Validate kiểm tra Ollama có đang chạy
+func (p *OllamaProvider) Validate(ctx context.Context) error {
+	req, err := http.NewRequestWithContext(ctx, "GET", p.baseURL+"/api/tags", nil)
+	if err != nil {
+		return err
+	}
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("ollama validate: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("ollama validate: HTTP %d", resp.StatusCode)
+	}
+	return nil
+}
+
+// Models trả về danh sách models từ Ollama API (dynamic)
+func (p *OllamaProvider) Models(ctx context.Context) ([]string, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", p.baseURL+"/api/tags", nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("ollama models: %w", err)
+	}
+	defer resp.Body.Close()
+	var result struct {
+		Models []struct {
+			Name string `json:"name"`
+		} `json:"models"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	names := make([]string, len(result.Models))
+	for i, m := range result.Models {
+		names[i] = m.Name
+	}
+	return names, nil
+}
