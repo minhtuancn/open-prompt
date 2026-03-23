@@ -174,6 +174,10 @@ func (r *Router) dispatch(conn net.Conn, req *Request) (interface{}, *RPCError) 
 		return r.handlePromptsExport(req)
 	case "prompts.import":
 		return r.handlePromptsImport(req)
+	case "analytics.aggregate":
+		return r.handleAnalyticsAggregate(req)
+	case "analytics.daily":
+		return r.handleAnalyticsDaily(req)
 	default:
 		return nil, &RPCError{Code: -32601, Message: fmt.Sprintf("method not found: %s", req.Method)}
 	}
