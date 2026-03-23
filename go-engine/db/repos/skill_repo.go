@@ -112,3 +112,33 @@ func (r *SkillRepo) Delete(id int64) error {
 	}
 	return nil
 }
+
+// UpdateSkillInput là input để cập nhật skill
+type UpdateSkillInput struct {
+	Name       string
+	PromptID   int64
+	PromptText string
+	Model      string
+	Provider   string
+	ConfigJSON string
+	Tags       string
+}
+
+// Lưu ý: ConfigJSON được giữ trong UpdateSkillInput để nhất quán với CreateSkillInput và cột config_json trong DB.
+
+// Update cập nhật skill theo ID
+func (r *SkillRepo) Update(id int64, input UpdateSkillInput) error {
+	var promptID interface{}
+	if input.PromptID > 0 {
+		promptID = input.PromptID
+	}
+	_, err := r.db.Exec(
+		`UPDATE skills SET name=?, prompt_id=?, prompt_text=?, model=?, provider=?, config_json=?, tags=?
+		 WHERE id=?`,
+		input.Name, promptID, input.PromptText, input.Model, input.Provider, input.ConfigJSON, input.Tags, id,
+	)
+	if err != nil {
+		return fmt.Errorf("update skill: %w", err)
+	}
+	return nil
+}

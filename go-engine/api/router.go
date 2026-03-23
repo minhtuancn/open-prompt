@@ -19,6 +19,7 @@ type Router struct {
 	users        *repos.UserRepo
 	settings     *repos.SettingsRepo
 	prompts      *repos.PromptRepo
+	skills       *repos.SkillRepo
 	tokenRepo    *repos.ProviderTokenRepo
 	priorityRepo *repos.ModelPriorityRepo
 	tokenManager *provider.TokenManager
@@ -29,6 +30,7 @@ func newRouter(s *Server) (*Router, error) {
 	users := repos.NewUserRepo(s.db)
 	settings := repos.NewSettingsRepo(s.db)
 	prompts := repos.NewPromptRepo(s.db)
+	skills := repos.NewSkillRepo(s.db)
 	tokenRepo := repos.NewProviderTokenRepo(s.db)
 	priorityRepo := repos.NewModelPriorityRepo(s.db)
 	registry := provider.DefaultRegistry()
@@ -49,6 +51,7 @@ func newRouter(s *Server) (*Router, error) {
 		users:        users,
 		settings:     settings,
 		prompts:      prompts,
+		skills:       skills,
 		tokenRepo:    tokenRepo,
 		priorityRepo: priorityRepo,
 		tokenManager: tokenManager,
@@ -93,6 +96,14 @@ func (r *Router) dispatch(conn net.Conn, req *Request) (interface{}, *RPCError) 
 		return r.handleCommandsList(req)
 	case "commands.resolve":
 		return r.handleCommandsResolve(req)
+	case "skills.list":
+		return r.handleSkillsList(req)
+	case "skills.create":
+		return r.handleSkillsCreate(req)
+	case "skills.update":
+		return r.handleSkillsUpdate(req)
+	case "skills.delete":
+		return r.handleSkillsDelete(req)
 	default:
 		return nil, &RPCError{Code: -32601, Message: fmt.Sprintf("method not found: %s", req.Method)}
 	}
