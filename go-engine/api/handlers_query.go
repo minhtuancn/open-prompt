@@ -9,7 +9,6 @@ import (
 
 	"github.com/minhtuancn/open-prompt/go-engine/db/repos"
 	"github.com/minhtuancn/open-prompt/go-engine/engine"
-	"github.com/minhtuancn/open-prompt/go-engine/model"
 	"github.com/minhtuancn/open-prompt/go-engine/model/providers"
 )
 
@@ -19,6 +18,7 @@ func (r *Router) handleQueryStream(conn net.Conn, req *Request) (interface{}, *R
 		Input     string            `json:"input"`
 		Model     string            `json:"model"`
 		System    string            `json:"system"`
+		Provider  string            `json:"provider"`
 		SlashName string            `json:"slash_name"`
 		ExtraVars map[string]string `json:"extra_vars"`
 	}
@@ -31,7 +31,7 @@ func (r *Router) handleQueryStream(conn net.Conn, req *Request) (interface{}, *R
 		return nil, copyErr(ErrUnauthorized)
 	}
 
-	// Nếu có slash_name, resolve template trước khi gửi lên model
+	// Resolve slash command nếu có
 	finalInput := p.Input
 	if p.SlashName != "" {
 		builder := engine.NewPromptBuilder()
@@ -46,29 +46,48 @@ func (r *Router) handleQueryStream(conn net.Conn, req *Request) (interface{}, *R
 		finalInput = resolved.RenderedPrompt
 	}
 
-	// Lấy API key từ settings
-	apiKey, _ := r.settings.Get(claims.UserID, "anthropic_api_key")
-	if apiKey == "" {
-		return nil, copyErr(ErrProviderNotFound)
+	// Xác định provider: explicit param > @mention > default
+	alias := p.Provider
+	if alias == "" {
+		var cleanInput string
+		alias, cleanInput = ParseMention(finalInput)
+		if alias != "" {
+			finalInput = cleanInput
+		}
 	}
 
-	// Build model router
-	modelRouter := model.NewRouter()
-	modelRouter.RegisterAnthropic(apiKey)
+	// Route đến provider
+	var prov providers.Provider
+	if alias != "" {
+		prov, err = r.providerRegistry.Route(alias)
+	} else {
+		prov, err = r.providerRegistry.Default()
+	}
+
+	// Fallback: nếu registry rỗng, thử lấy API key từ settings (tương thích Phase 1)
+	// TODO: Phase 2A2 sẽ register providers khi khởi động → bỏ fallback này
+	if err != nil {
+		apiKey, _ := r.settings.Get(claims.UserID, "anthropic_api_key")
+		if apiKey != "" {
+			prov = providers.NewAnthropicProvider(apiKey)
+		} else {
+			return nil, &RPCError{Code: ErrProviderNotFound.Code, Message: err.Error()}
+		}
+	}
 
 	modelName := p.Model
 	if modelName == "" {
 		modelName = "claude-3-5-sonnet-20241022"
 	}
 
-	// Bắt đầu tính latency và thu thập chunks
+	// Stream response
 	start := time.Now()
 	var sb strings.Builder
 
-	// Stream response qua JSON-RPC notifications
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
-	streamErr := modelRouter.Stream(ctx, providers.CompletionRequest{
+
+	streamErr := prov.StreamComplete(ctx, providers.CompletionRequest{
 		Model:  modelName,
 		Prompt: finalInput,
 		System: p.System,
@@ -81,43 +100,52 @@ func (r *Router) handleQueryStream(conn net.Conn, req *Request) (interface{}, *R
 	})
 
 	latency := time.Since(start).Milliseconds()
+	providerName := prov.Name()
 
 	if streamErr != nil {
-		_ = SendNotification(conn, "stream.chunk", map[string]interface{}{
-			"delta": "",
-			"done":  true,
-			"error": fmt.Sprintf("%v", streamErr),
-		})
-		// Ghi history với trạng thái error
+		// Thêm fallback_providers khi lỗi
+		doneParams := map[string]interface{}{
+			"delta":         "",
+			"done":          true,
+			"error":         fmt.Sprintf("%v", streamErr),
+			"error_message": fmt.Sprintf("%s: %v", providerName, streamErr),
+		}
+		candidates := r.providerRegistry.FallbackCandidates(providerName)
+		if len(candidates) > 0 {
+			names := make([]string, len(candidates))
+			for i, c := range candidates {
+				names[i] = c.Name()
+			}
+			doneParams["fallback_providers"] = names
+		}
+		_ = SendNotification(conn, "stream.chunk", doneParams)
+
 		_ = r.history.Insert(repos.InsertHistoryInput{
 			UserID:    claims.UserID,
 			Query:     finalInput,
-			// TODO: lấy provider thực từ model router khi hỗ trợ multi-provider
-			Provider:  "anthropic",
+			Provider:  providerName,
 			Model:     modelName,
 			LatencyMs: latency,
 			Status:    repos.HistoryStatusError,
 		})
-		return nil, nil // notification đã gửi
+		return nil, nil
 	}
 
-	// Gửi notification done
+	// Done notification
 	_ = SendNotification(conn, "stream.chunk", map[string]interface{}{
 		"delta": "",
 		"done":  true,
 	})
 
-	// Ghi history với trạng thái success
 	_ = r.history.Insert(repos.InsertHistoryInput{
 		UserID:    claims.UserID,
 		Query:     finalInput,
 		Response:  sb.String(),
-		// TODO: lấy provider thực từ model router khi hỗ trợ multi-provider
-		Provider:  "anthropic",
+		Provider:  providerName,
 		Model:     modelName,
 		LatencyMs: latency,
 		Status:    repos.HistoryStatusSuccess,
 	})
 
-	return nil, nil // response delivered via notifications
+	return nil, nil
 }

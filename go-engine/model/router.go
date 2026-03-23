@@ -7,28 +7,35 @@ import (
 	"github.com/minhtuancn/open-prompt/go-engine/model/providers"
 )
 
-// Router route request đến đúng provider
+// Router route request đến đúng provider qua Registry
 type Router struct {
-	providers map[string]*providers.AnthropicProvider
+	registry *providers.Registry
 }
 
 // NewRouter tạo router mới
-func NewRouter() *Router {
-	return &Router{
-		providers: make(map[string]*providers.AnthropicProvider),
-	}
+func NewRouter(registry *providers.Registry) *Router {
+	return &Router{registry: registry}
 }
 
-// RegisterAnthropic đăng ký Anthropic provider
-func (r *Router) RegisterAnthropic(apiKey string) {
-	r.providers["anthropic"] = providers.NewAnthropicProvider(apiKey)
-}
+// Stream gửi request đến provider theo alias
+// alias="" → dùng Default provider
+func (r *Router) Stream(ctx context.Context, alias string, req providers.CompletionRequest, onChunk func(string)) error {
+	var p providers.Provider
+	var err error
 
-// Stream gửi request và stream response qua callback
-func (r *Router) Stream(ctx context.Context, req providers.CompletionRequest, onChunk func(string)) error {
-	p, ok := r.providers["anthropic"]
-	if !ok {
-		return fmt.Errorf("no provider configured")
+	if alias != "" {
+		p, err = r.registry.Route(alias)
+	} else {
+		p, err = r.registry.Default()
 	}
+	if err != nil {
+		return fmt.Errorf("route provider: %w", err)
+	}
+
 	return p.StreamComplete(ctx, req, onChunk)
+}
+
+// Registry trả về underlying registry
+func (r *Router) Registry() *providers.Registry {
+	return r.registry
 }

@@ -9,6 +9,7 @@ import (
 
 	"github.com/minhtuancn/open-prompt/go-engine/auth"
 	"github.com/minhtuancn/open-prompt/go-engine/db/repos"
+	"github.com/minhtuancn/open-prompt/go-engine/model/providers"
 	"github.com/minhtuancn/open-prompt/go-engine/provider"
 )
 
@@ -23,8 +24,9 @@ type Router struct {
 	history      *repos.HistoryRepo
 	tokenRepo    *repos.ProviderTokenRepo
 	priorityRepo *repos.ModelPriorityRepo
-	tokenManager *provider.TokenManager
-	registry     *provider.Registry
+	tokenManager     *provider.TokenManager
+	registry         *provider.Registry
+	providerRegistry *providers.Registry
 }
 
 func newRouter(s *Server) (*Router, error) {
@@ -36,6 +38,9 @@ func newRouter(s *Server) (*Router, error) {
 	tokenRepo := repos.NewProviderTokenRepo(s.db)
 	priorityRepo := repos.NewModelPriorityRepo(s.db)
 	registry := provider.DefaultRegistry()
+	// Provider routing registry — Phase 2A1
+	// TODO: Phase 2A2 sẽ register providers dựa trên detected tokens
+	providerReg := providers.NewRegistry()
 	kc := provider.NewKeychain(provider.KeychainServiceName)
 	tokenManager := provider.NewTokenManager(kc, tokenRepo, registry)
 	// Derive JWT secret từ socket secret bằng HMAC-SHA256.
@@ -57,8 +62,9 @@ func newRouter(s *Server) (*Router, error) {
 		history:      history,
 		tokenRepo:    tokenRepo,
 		priorityRepo: priorityRepo,
-		tokenManager: tokenManager,
-		registry:     registry,
+		tokenManager:     tokenManager,
+		registry:         registry,
+		providerRegistry: providerReg,
 	}, nil
 }
 
