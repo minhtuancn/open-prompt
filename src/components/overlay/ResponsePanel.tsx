@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { useOverlayStore } from '../../store/overlayStore'
 import { FallbackDialog } from './FallbackDialog'
+import { MarkdownRenderer } from './MarkdownRenderer'
 
 export function ResponsePanel() {
   const { chunks, isStreaming, error, fallbackProviders, setFallbackProviders } = useOverlayStore()
@@ -78,10 +79,13 @@ export function ResponsePanel() {
           </>
         ) : (
           <>
-            <p className="text-white/90 text-sm leading-relaxed whitespace-pre-wrap">
-              {text}
-              {isStreaming && <span className="animate-pulse">▌</span>}
-            </p>
+            {isStreaming ? (
+              <p className="text-white/90 text-sm leading-relaxed whitespace-pre-wrap">
+                {text}<span className="animate-pulse">▌</span>
+              </p>
+            ) : (
+              <MarkdownRenderer text={text} />
+            )}
 
             {text && !isStreaming && (
               <div className="mt-3 flex items-center gap-2">
