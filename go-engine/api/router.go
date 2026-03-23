@@ -56,6 +56,14 @@ func (r *Router) dispatch(conn net.Conn, req *Request) (interface{}, *RPCError) 
 		return r.handleSettingsSet(req)
 	case "query.stream":
 		return r.handleQueryStream(conn, req)
+	case "providers.list":
+		return r.handleProvidersList(req)
+	case "providers.detect":
+		return r.handleProvidersDetect(req)
+	case "providers.connect":
+		return r.handleProvidersConnect(req)
+	case "providers.set_priority":
+		return r.handleProvidersSetPriority(req)
 	default:
 		return nil, &RPCError{Code: -32601, Message: fmt.Sprintf("method not found: %s", req.Method)}
 	}
