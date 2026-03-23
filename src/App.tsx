@@ -7,9 +7,10 @@ import { LoginScreen } from './components/auth/LoginScreen'
 import { CommandInput } from './components/overlay/CommandInput'
 import { ResponsePanel } from './components/overlay/ResponsePanel'
 import { ApiKeySetup } from './components/settings/ApiKeySetup'
+import { SettingsLayout } from './components/settings/SettingsLayout'
 import './styles/globals.css'
 
-type AppState = 'loading' | 'first-run' | 'login' | 'api-setup' | 'overlay'
+type AppState = 'loading' | 'first-run' | 'login' | 'api-setup' | 'overlay' | 'settings'
 
 export default function App() {
   const [state, setState] = useState<AppState>('loading')
@@ -66,9 +67,28 @@ export default function App() {
     return <ApiKeySetup onDone={() => setState('overlay')} />
   }
 
+  if (state === 'settings') {
+    return (
+      <div className="bg-surface/95 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden">
+        <SettingsLayout onClose={() => setState('overlay')} />
+      </div>
+    )
+  }
+
   return (
     <div className="bg-surface/95 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden min-h-16">
-      <CommandInput onSubmit={handleQuery} />
+      <div className="flex items-start">
+        <div className="flex-1 min-w-0">
+          <CommandInput onSubmit={handleQuery} />
+        </div>
+        <button
+          onClick={() => setState('settings')}
+          title="Cài đặt"
+          className="p-3 mt-2 mr-2 text-white/25 hover:text-white/60 transition-colors text-base shrink-0"
+        >
+          ⚙
+        </button>
+      </div>
       <ResponsePanel />
     </div>
   )
