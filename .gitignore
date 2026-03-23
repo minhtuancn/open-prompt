@@ -13,6 +13,12 @@ src-tauri/target/
 .env
 .env.local
 
+# Go build output
+go-engine/bin/
+
+# Superpowers brainstorm cache
+.superpowers/
+
 # OS
 .DS_Store
 Thumbs.db
