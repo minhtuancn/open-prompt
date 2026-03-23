@@ -39,12 +39,18 @@ func (c *Client) IsEnabled() bool {
 	return c.enabled
 }
 
-// Track ghi nhận event (chỉ khi enabled)
+const maxEvents = 1000
+
+// Track ghi nhận event (chỉ khi enabled, tối đa 1000 events trong buffer)
 func (c *Client) Track(name string, props map[string]string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if !c.enabled {
 		return
+	}
+	if len(c.events) >= maxEvents {
+		// Xoá 25% events cũ nhất khi đầy
+		c.events = c.events[maxEvents/4:]
 	}
 	c.events = append(c.events, Event{Name: name, Props: props})
 	log.Printf("[telemetry] %s %v", name, props)

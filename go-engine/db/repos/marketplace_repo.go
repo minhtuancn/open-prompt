@@ -103,12 +103,22 @@ func (r *MarketplaceRepo) Search(query string, limit int) ([]SharedPrompt, error
 	return result, nil
 }
 
+// PublishInput chứa thông tin để publish prompt
+type PublishInput struct {
+	UserID      int64
+	Title       string
+	Content     string
+	Description string
+	Category    string
+	Tags        string
+}
+
 // Publish thêm prompt vào marketplace
-func (r *MarketplaceRepo) Publish(userID int64, title, content, description, category, tags string) (int64, error) {
+func (r *MarketplaceRepo) Publish(input PublishInput) (int64, error) {
 	res, err := r.db.Exec(`
 		INSERT INTO shared_prompts (user_id, title, content, description, category, tags)
 		VALUES (?, ?, ?, ?, ?, ?)
-	`, userID, title, content, description, category, tags)
+	`, input.UserID, input.Title, input.Content, input.Description, input.Category, input.Tags)
 	if err != nil {
 		return 0, err
 	}

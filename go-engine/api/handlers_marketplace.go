@@ -3,6 +3,8 @@ package api
 import (
 	"fmt"
 	"regexp"
+
+	"github.com/minhtuancn/open-prompt/go-engine/db/repos"
 )
 
 // htmlTagRegex strip HTML tags từ input
@@ -95,7 +97,14 @@ func (r *Router) handleMarketplacePublish(req *Request) (interface{}, *RPCError)
 	p.Category = sanitizeMarketplaceText(p.Category, 50)
 	p.Tags = sanitizeMarketplaceText(p.Tags, 200)
 
-	id, err := r.marketplace.Publish(claims.UserID, p.Title, p.Content, p.Description, p.Category, p.Tags)
+	id, err := r.marketplace.Publish(repos.PublishInput{
+		UserID:      claims.UserID,
+		Title:       p.Title,
+		Content:     p.Content,
+		Description: p.Description,
+		Category:    p.Category,
+		Tags:        p.Tags,
+	})
 	if err != nil {
 		return nil, &RPCError{Code: ErrInternal.Code, Message: fmt.Sprintf("publish: %v", err)}
 	}

@@ -5,7 +5,8 @@ import (
 	"time"
 )
 
-// RateLimiter giới hạn số lượng requests theo method
+// RateLimiter giới hạn số lượng requests theo method.
+// Tự động cleanup expired entries mỗi 5 phút.
 type RateLimiter struct {
 	mu      sync.Mutex
 	buckets map[string]*bucket
@@ -18,29 +19,36 @@ type limitConfig struct {
 }
 
 type bucket struct {
-	count    int
-	resetAt  time.Time
+	count   int
+	resetAt time.Time
 }
 
-// NewRateLimiter tạo rate limiter với per-method limits
 func NewRateLimiter() *RateLimiter {
-	return &RateLimiter{
+	rl := &RateLimiter{
 		buckets: make(map[string]*bucket),
 		limits: map[string]limitConfig{
-			"auth.login":          {maxRequests: 5, window: time.Minute},       // 5 login/phút
-			"auth.register":       {maxRequests: 3, window: time.Minute},       // 3 register/phút
-			"marketplace.publish": {maxRequests: 5, window: time.Minute},       // 5 publish/phút
-			"marketplace.search":  {maxRequests: 30, window: time.Minute},      // 30 search/phút
+			"auth.login":          {maxRequests: 5, window: time.Minute},
+			"auth.register":       {maxRequests: 3, window: time.Minute},
+			"marketplace.publish": {maxRequests: 5, window: time.Minute},
+			"marketplace.search":  {maxRequests: 30, window: time.Minute},
 		},
 	}
+	// Cleanup expired buckets mỗi 5 phút để tránh memory leak
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			rl.cleanup()
+		}
+	}()
+	return rl
 }
 
 // Allow kiểm tra xem request có được phép không
-// key = method (vd: "auth.login"), caller = identifier (vd: remote addr)
 func (rl *RateLimiter) Allow(method, caller string) bool {
 	limit, exists := rl.limits[method]
 	if !exists {
-		return true // Không có limit cho method này
+		return true
 	}
 
 	rl.mu.Lock()
@@ -60,4 +68,16 @@ func (rl *RateLimiter) Allow(method, caller string) bool {
 	}
 	b.count++
 	return true
+}
+
+// cleanup xoá expired entries khỏi buckets map
+func (rl *RateLimiter) cleanup() {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	now := time.Now()
+	for key, b := range rl.buckets {
+		if now.After(b.resetAt) {
+			delete(rl.buckets, key)
+		}
+	}
 }

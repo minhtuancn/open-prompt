@@ -106,7 +106,6 @@ func (r *Router) handlePromptsUpdate(req *Request) (interface{}, *RPCError) {
 		return nil, &RPCError{Code: -32001, Message: "không có quyền truy cập prompt này"}
 	}
 
-	// Update trả về error, sau đó lấy prompt mới nhất bằng FindByID
 	if err := r.prompts.Update(p.ID, repos.UpdatePromptInput{
 		Title:     p.Title,
 		Content:   p.Content,
@@ -117,11 +116,12 @@ func (r *Router) handlePromptsUpdate(req *Request) (interface{}, *RPCError) {
 	}); err != nil {
 		return nil, copyErr(ErrInternal)
 	}
-	prompt, err := r.prompts.FindByID(p.ID)
-	if err != nil || prompt == nil {
-		return nil, copyErr(ErrInternal)
-	}
-	return map[string]interface{}{"prompt": prompt}, nil
+	// Reuse existing record + merge updated fields (tránh FindByID thêm lần nữa)
+	existing.Title = p.Title
+	existing.Content = p.Content
+	existing.Category = p.Category
+	existing.Tags = p.Tags
+	return map[string]interface{}{"prompt": existing}, nil
 }
 
 // handlePromptsDelete xoá prompt
