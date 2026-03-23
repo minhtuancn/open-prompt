@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// mentionRegex match @alias — không match email (ký tự word trước @)
+// mentionRegex match @alias nhưng reject email (user@example.com)
 var mentionRegex = regexp.MustCompile(`(?:^|\s)@([a-zA-Z0-9_-]+)`)
 
 // ParseMention tách @alias và prompt sạch

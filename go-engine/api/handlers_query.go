@@ -110,12 +110,7 @@ func (r *Router) handleQueryStream(conn net.Conn, req *Request) (interface{}, *R
 			"error":         fmt.Sprintf("%v", streamErr),
 			"error_message": fmt.Sprintf("%s: %v", providerName, streamErr),
 		}
-		candidates := r.providerRegistry.FallbackCandidates(providerName)
-		if len(candidates) > 0 {
-			names := make([]string, len(candidates))
-			for i, c := range candidates {
-				names[i] = c.Name()
-			}
+		if names := r.providerRegistry.FallbackCandidateNames(providerName); len(names) > 0 {
 			doneParams["fallback_providers"] = names
 		}
 		_ = SendNotification(conn, "stream.chunk", doneParams)

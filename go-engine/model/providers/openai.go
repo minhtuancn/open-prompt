@@ -38,6 +38,9 @@ func (p *OpenAIProvider) StreamComplete(ctx context.Context, req CompletionReque
 	if req.MaxTokens == 0 {
 		req.MaxTokens = 4096
 	}
+	if req.Temperature == 0 {
+		req.Temperature = 0.7
+	}
 	messages := []map[string]string{
 		{"role": "user", "content": req.Prompt},
 	}
