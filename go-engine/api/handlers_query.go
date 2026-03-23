@@ -14,13 +14,14 @@ import (
 
 func (r *Router) handleQueryStream(conn net.Conn, req *Request) (interface{}, *RPCError) {
 	var p struct {
-		Token     string            `json:"token"`
-		Input     string            `json:"input"`
-		Model     string            `json:"model"`
-		System    string            `json:"system"`
-		Provider  string            `json:"provider"`
-		SlashName string            `json:"slash_name"`
-		ExtraVars map[string]string `json:"extra_vars"`
+		Token          string            `json:"token"`
+		Input          string            `json:"input"`
+		Model          string            `json:"model"`
+		System         string            `json:"system"`
+		Provider       string            `json:"provider"`
+		SlashName      string            `json:"slash_name"`
+		ExtraVars      map[string]string `json:"extra_vars"`
+		ConversationID int64             `json:"conversation_id"`
 	}
 	if err := decodeParams(req.Params, &p); err != nil {
 		return nil, copyErr(ErrInvalidParams)
@@ -141,6 +142,12 @@ func (r *Router) handleQueryStream(conn net.Conn, req *Request) (interface{}, *R
 		LatencyMs: latency,
 		Status:    repos.HistoryStatusSuccess,
 	})
+
+	// Lưu vào conversation nếu có conversation_id
+	if p.ConversationID > 0 {
+		_ = r.conversations.AddMessage(p.ConversationID, "user", finalInput, "", "", 0)
+		_ = r.conversations.AddMessage(p.ConversationID, "assistant", sb.String(), providerName, modelName, latency)
+	}
 
 	return nil, nil
 }
