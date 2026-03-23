@@ -1,87 +1,82 @@
-package model_test
+package model
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"testing"
 
-	"github.com/minhtuancn/open-prompt/go-engine/model"
+	"github.com/minhtuancn/open-prompt/go-engine/model/providers"
 )
 
-type mockProvider struct {
-	name    string
-	callErr error
-	called  bool
+// testProvider implements providers.Provider cho test
+type testProvider struct {
+	name   string
+	err    error
+	called bool
 }
 
-func (m *mockProvider) StreamComplete(ctx context.Context, req model.StreamRequest, onChunk func(string)) error {
-	m.called = true
-	if m.callErr != nil {
-		return m.callErr
+func (t *testProvider) Name() string                              { return t.name }
+func (t *testProvider) DisplayName() string                       { return t.name }
+func (t *testProvider) Aliases() []string                         { return nil }
+func (t *testProvider) GetAuthType() providers.AuthType           { return providers.AuthNone }
+func (t *testProvider) Validate(_ context.Context) error          { return nil }
+func (t *testProvider) Models(_ context.Context) ([]string, error) { return nil, nil }
+func (t *testProvider) StreamComplete(_ context.Context, _ providers.CompletionRequest, onChunk func(string)) error {
+	t.called = true
+	if t.err != nil {
+		return t.err
 	}
-	onChunk("response from " + m.name)
+	onChunk("hello from " + t.name)
 	return nil
 }
 
 func TestFallbackChainSuccess(t *testing.T) {
-	p1 := &mockProvider{name: "p1", callErr: errors.New("rate limit 429")}
-	p2 := &mockProvider{name: "p2"}
+	p1 := &testProvider{name: "p1", err: fmt.Errorf("HTTP 429 rate limit")}
+	p2 := &testProvider{name: "p2"}
 
-	chain := model.NewFallbackChain([]model.NamedProvider{
-		{Name: "p1", Provider: p1},
-		{Name: "p2", Provider: p2},
+	chain := NewFallbackChain([]providers.Provider{p1, p2})
+	var chunks []string
+	err := chain.StreamComplete(context.Background(), providers.CompletionRequest{}, func(s string) {
+		chunks = append(chunks, s)
 	})
-
-	var got string
-	err := chain.StreamComplete(context.Background(), model.StreamRequest{Prompt: "hello"}, func(s string) {
-		got = s
-	})
-
 	if err != nil {
-		t.Fatalf("FallbackChain.StreamComplete() error = %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if !p1.called {
-		t.Error("p1 phải được gọi trước")
+	if !p1.called || !p2.called {
+		t.Error("both providers should be called")
 	}
-	if !p2.called {
-		t.Error("p2 phải được gọi khi p1 thất bại")
-	}
-	if got != "response from p2" {
-		t.Errorf("got = %q, want %q", got, "response from p2")
+	if len(chunks) == 0 || chunks[0] != "hello from p2" {
+		t.Errorf("got chunks=%v, want ['hello from p2']", chunks)
 	}
 }
 
 func TestFallbackChainAllFail(t *testing.T) {
-	p1 := &mockProvider{name: "p1", callErr: errors.New("error")}
-	p2 := &mockProvider{name: "p2", callErr: errors.New("error")}
+	p1 := &testProvider{name: "p1", err: fmt.Errorf("HTTP 503")}
+	p2 := &testProvider{name: "p2", err: fmt.Errorf("HTTP 502")}
 
-	chain := model.NewFallbackChain([]model.NamedProvider{
-		{Name: "p1", Provider: p1},
-		{Name: "p2", Provider: p2},
-	})
-
-	err := chain.StreamComplete(context.Background(), model.StreamRequest{}, func(s string) {})
+	chain := NewFallbackChain([]providers.Provider{p1, p2})
+	err := chain.StreamComplete(context.Background(), providers.CompletionRequest{}, func(string) {})
 	if err == nil {
-		t.Error("phải trả về error khi tất cả providers thất bại")
+		t.Fatal("expected error")
 	}
 }
 
 func TestIsFallbackError(t *testing.T) {
 	tests := []struct {
-		err  error
+		err  string
 		want bool
 	}{
-		{errors.New("rate limit 429"), true},
-		{errors.New("HTTP 503 service unavailable"), true},
-		{errors.New("timeout exceeded"), true},
-		{errors.New("context deadline exceeded"), true},
-		{errors.New("invalid api key"), false},
-		{errors.New("bad request"), false},
+		{"HTTP 429 rate limit", true},
+		{"HTTP 503", true},
+		{"timeout", true},
+		{"context deadline exceeded", true},
+		{"invalid api key", false},
+		{"bad request", false},
 	}
 	for _, tt := range tests {
-		got := model.IsFallbackError(tt.err)
+		got := IsFallbackError(fmt.Errorf("%s", tt.err))
 		if got != tt.want {
-			t.Errorf("IsFallbackError(%q) = %v, want %v", tt.err.Error(), got, tt.want)
+			t.Errorf("IsFallbackError(%q)=%v, want %v", tt.err, got, tt.want)
 		}
 	}
 }

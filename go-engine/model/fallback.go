@@ -4,54 +4,36 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	"github.com/minhtuancn/open-prompt/go-engine/model/providers"
 )
-
-// StreamRequest là request chung cho tất cả providers trong fallback chain
-type StreamRequest struct {
-	Model       string
-	Prompt      string
-	System      string
-	Temperature float64
-	MaxTokens   int
-}
-
-// StreamProvider là interface chung cho tất cả AI providers
-type StreamProvider interface {
-	StreamComplete(ctx context.Context, req StreamRequest, onChunk func(string)) error
-}
-
-// NamedProvider kết hợp tên và provider
-type NamedProvider struct {
-	Name     string
-	Provider StreamProvider
-}
 
 // FallbackChain thực hiện fallback tuần tự qua danh sách providers
 type FallbackChain struct {
-	providers []NamedProvider
+	providers []providers.Provider
 }
 
 // NewFallbackChain tạo fallback chain mới
-func NewFallbackChain(providers []NamedProvider) *FallbackChain {
-	return &FallbackChain{providers: providers}
+func NewFallbackChain(providerList []providers.Provider) *FallbackChain {
+	return &FallbackChain{providers: providerList}
 }
 
 // StreamComplete thực hiện streaming, fallback qua chain nếu cần
-func (c *FallbackChain) StreamComplete(ctx context.Context, req StreamRequest, onChunk func(string)) error {
+func (c *FallbackChain) StreamComplete(ctx context.Context, req providers.CompletionRequest, onChunk func(string)) error {
 	if len(c.providers) == 0 {
 		return fmt.Errorf("fallback chain rỗng — không có provider nào")
 	}
 	var lastErr error
-	for _, np := range c.providers {
-		err := np.Provider.StreamComplete(ctx, req, onChunk)
+	for _, p := range c.providers {
+		err := p.StreamComplete(ctx, req, onChunk)
 		if err == nil {
 			return nil
 		}
 		if IsFallbackError(err) {
-			lastErr = fmt.Errorf("provider %q thất bại: %w", np.Name, err)
+			lastErr = fmt.Errorf("provider %q thất bại: %w", p.Name(), err)
 			continue
 		}
-		return fmt.Errorf("provider %q lỗi không thể fallback: %w", np.Name, err)
+		return fmt.Errorf("provider %q lỗi không thể fallback: %w", p.Name(), err)
 	}
 	return fmt.Errorf("tất cả providers đều thất bại, lỗi cuối: %w", lastErr)
 }
