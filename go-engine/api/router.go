@@ -29,6 +29,7 @@ type Router struct {
 	registry         *provider.Registry
 	providerRegistry *providers.Registry
 	conversations    *repos.ConversationRepo
+	healthChecker    *provider.HealthChecker
 }
 
 func newRouter(s *Server) (*Router, error) {
@@ -45,6 +46,9 @@ func newRouter(s *Server) (*Router, error) {
 	providerReg := providers.NewRegistry()
 	registerProvidersFromDB(providerReg, tokenRepo)
 	registerProvidersFromEnv(providerReg)
+	// Health checker — ping providers mỗi 5 phút
+	hc := provider.NewHealthChecker(providerReg, 0)
+	hc.Start()
 	kc := provider.NewKeychain(provider.KeychainServiceName)
 	tokenManager := provider.NewTokenManager(kc, tokenRepo, registry)
 	// Derive JWT secret từ socket secret bằng HMAC-SHA256.
@@ -70,6 +74,7 @@ func newRouter(s *Server) (*Router, error) {
 		registry:         registry,
 		providerRegistry: providerReg,
 		conversations:    conversations,
+		healthChecker:    hc,
 	}, nil
 }
 
@@ -146,6 +151,8 @@ func (r *Router) dispatch(conn net.Conn, req *Request) (interface{}, *RPCError) 
 		return r.handleConversationsMessages(req)
 	case "conversations.delete":
 		return r.handleConversationsDelete(req)
+	case "health.check":
+		return r.handleHealthCheck(req)
 	default:
 		return nil, &RPCError{Code: -32601, Message: fmt.Sprintf("method not found: %s", req.Method)}
 	}
