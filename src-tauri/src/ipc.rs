@@ -86,6 +86,67 @@ pub async fn call_engine(
     .map_err(|e| e.to_string())?
 }
 
+/// call_engine_sync là blocking version của call_engine, dùng khi không ở trong async context.
+/// Không hỗ trợ streaming.
+pub fn call_engine_sync(
+    app: &AppHandle,
+    method: &str,
+    params: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let secret = app.state::<crate::sidecar::EngineSecret>().0.clone();
+
+    let envelope = RpcEnvelope {
+        secret,
+        request: RpcRequestInner {
+            jsonrpc: "2.0".into(),
+            method: method.to_string(),
+            params,
+            id: 9999,
+        },
+    };
+
+    let mut msg = serde_json::to_vec(&envelope).map_err(|e| e.to_string())?;
+    msg.push(b'\n');
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::net::UnixStream;
+        let mut conn =
+            UnixStream::connect("/tmp/open-prompt.sock").map_err(|e| format!("connect: {e}"))?;
+        conn.write_all(&msg).map_err(|e| e.to_string())?;
+        let mut reader = BufReader::new(conn);
+        let mut line = String::new();
+        reader.read_line(&mut line).map_err(|e| e.to_string())?;
+        let resp: RpcResponse =
+            serde_json::from_str(line.trim()).map_err(|e| format!("parse: {e}"))?;
+        if let Some(err) = resp.error {
+            return Err(err.to_string());
+        }
+        return Ok(resp.result.unwrap_or(serde_json::Value::Null));
+    }
+
+    #[cfg(windows)]
+    {
+        use std::net::TcpStream;
+        let port = app.state::<crate::sidecar::EnginePort>().0;
+        let addr = format!("127.0.0.1:{port}");
+        let mut conn = TcpStream::connect(&addr).map_err(|e| format!("connect {addr}: {e}"))?;
+        conn.write_all(&msg).map_err(|e| e.to_string())?;
+        let mut reader = BufReader::new(conn);
+        let mut line = String::new();
+        reader.read_line(&mut line).map_err(|e| e.to_string())?;
+        let resp: RpcResponse =
+            serde_json::from_str(line.trim()).map_err(|e| format!("parse: {e}"))?;
+        if let Some(err) = resp.error {
+            return Err(err.to_string());
+        }
+        return Ok(resp.result.unwrap_or(serde_json::Value::Null));
+    }
+
+    #[cfg(not(any(unix, windows)))]
+    Err("platform không được hỗ trợ".to_string())
+}
+
 /// handle_response đọc response(s) từ socket
 fn handle_response<R: BufRead>(
     mut reader: R,

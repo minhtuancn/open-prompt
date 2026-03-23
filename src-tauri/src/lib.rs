@@ -13,6 +13,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .manage(SidecarState(std::sync::Mutex::new(None)))
         .manage(EnginePort(0))
+        .manage(window::FocusedApp(std::sync::Mutex::new(window::AppContext::default())))
         .invoke_handler(tauri::generate_handler![
             ipc::call_engine,
             injection::inject_text,
