@@ -6,19 +6,27 @@ export async function callEngine<T>(method: string, params: Record<string, unkno
   return invoke<T>('call_engine', { method, params })
 }
 
+interface StreamChunkPayload {
+  delta: string
+  done: boolean
+  error?: string
+  error_message?: string
+  fallback_providers?: string[]
+}
+
 /** streamQuery gọi query.stream và subscribe notifications */
 export async function streamQuery(
-  params: { token: string; input: string; model?: string },
+  params: { token: string; input: string; model?: string; provider?: string },
   onChunk: (chunk: string) => void,
   onDone: () => void,
-  onError: (err: string) => void,
+  onError: (err: string, fallbackProviders?: string[]) => void,
 ): Promise<void> {
-  const unlisten = await listen<{ delta: string; done: boolean; error?: string }>(
+  const unlisten = await listen<StreamChunkPayload>(
     'stream-chunk',
     (event) => {
-      const { delta, done, error } = event.payload
+      const { delta, done, error, error_message, fallback_providers } = event.payload
       if (error) {
-        onError(error)
+        onError(error_message || error, fallback_providers)
         unlisten()
         return
       }
@@ -31,6 +39,5 @@ export async function streamQuery(
     }
   )
 
-  // Trigger stream (fire and forget — response arrives via events)
-  callEngine('query.stream', params).catch(onError)
+  callEngine('query.stream', params).catch((e) => onError(String(e)))
 }
