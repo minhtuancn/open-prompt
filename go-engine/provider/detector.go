@@ -2,11 +2,13 @@ package provider
 
 import (
 	"encoding/json"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 )
 
 // DetectedProvider chứa thông tin một provider được detect
@@ -19,9 +21,10 @@ type DetectedProvider struct {
 
 // DetectorConfig cấu hình cho Detector
 type DetectorConfig struct {
-	ScanFiles   bool   // có quét config files không
-	ClaudeJSON  string // override path ~/.claude/claude.json (cho test)
-	GHHostsYAML string // override path ~/.config/gh/hosts.yml (cho test)
+	ScanFiles   bool     // có quét config files không
+	ClaudeJSON  string   // override path ~/.claude/claude.json (cho test)
+	GHHostsYAML string   // override path ~/.config/gh/hosts.yml (cho test)
+	LocalPorts  []string // override ports cho test (ví dụ ["localhost:12345"])
 }
 
 // Detector phát hiện các AI providers đã cài trên máy
@@ -38,16 +41,13 @@ func NewDetector(config DetectorConfig) *Detector {
 func (d *Detector) Detect() []DetectedProvider {
 	var results []DetectedProvider
 
-	// 1. Env vars (ưu tiên cao nhất)
 	results = append(results, d.detectFromEnv()...)
-
-	// 2. Config files (chỉ khi được bật)
+	results = append(results, d.detectFromCLI()...)
 	if d.config.ScanFiles {
 		results = append(results, d.detectFromFiles()...)
 	}
-
-	// 3. Running processes (Ollama)
 	results = append(results, d.detectFromProcesses()...)
+	results = append(results, d.detectFromLocalPorts()...)
 
 	return results
 }
@@ -57,10 +57,13 @@ func (d *Detector) detectFromEnv() []DetectedProvider {
 	var results []DetectedProvider
 
 	envMap := map[string]string{
-		"ANTHROPIC_API_KEY": "anthropic",
-		"OPENAI_API_KEY":    "openai",
-		"GOOGLE_API_KEY":    "gemini",
-		"GITHUB_TOKEN":      "github_copilot",
+		"ANTHROPIC_API_KEY":  "anthropic",
+		"OPENAI_API_KEY":     "openai",
+		"GOOGLE_API_KEY":     "gemini",
+		"GEMINI_API_KEY":     "gemini",
+		"AI_STUDIO_KEY":      "gemini",
+		"GITHUB_TOKEN":       "copilot",
+		"OPENROUTER_API_KEY": "openrouter",
 	}
 
 	for envKey, providerID := range envMap {
@@ -137,6 +140,72 @@ func (d *Detector) detectFromProcesses() []DetectedProvider {
 			Source:     "process",
 		})
 	}
+	return results
+}
+
+// detectFromCLI phát hiện từ CLI tools (gh, gcloud)
+func (d *Detector) detectFromCLI() []DetectedProvider {
+	var results []DetectedProvider
+
+	// gh auth token → GitHub Copilot
+	if out, err := exec.Command("gh", "auth", "token").Output(); err == nil {
+		token := strings.TrimSpace(string(out))
+		if token != "" {
+			results = append(results, DetectedProvider{
+				ProviderID: "copilot",
+				Token:      token,
+				Source:     "cli",
+			})
+		}
+	}
+
+	return results
+}
+
+// detectFromLocalPorts phát hiện local AI servers qua TCP
+func (d *Detector) detectFromLocalPorts() []DetectedProvider {
+	var results []DetectedProvider
+
+	ports := d.config.LocalPorts
+	if len(ports) == 0 {
+		ports = []string{"localhost:11434", "localhost:4000", "localhost:8000"}
+	}
+
+	portNames := map[string]string{
+		"11434": "ollama",
+		"4000":  "litellm",
+		"8000":  "vllm",
+	}
+
+	client := &http.Client{Timeout: 500 * time.Millisecond}
+	for _, addr := range ports {
+		// Thử OpenAI-compat endpoint trước
+		resp, err := client.Get("http://" + addr + "/v1/models")
+		if err != nil {
+			// Thử Ollama native endpoint
+			resp, err = client.Get("http://" + addr + "/api/tags")
+		}
+		if err != nil {
+			continue
+		}
+		resp.Body.Close()
+		if resp.StatusCode == http.StatusOK {
+			name := "gateway"
+			parts := strings.Split(addr, ":")
+			if len(parts) == 2 {
+				if n, ok := portNames[parts[1]]; ok {
+					name = n
+				}
+			}
+			results = append(results, DetectedProvider{
+				ProviderID: name,
+				Token:      "",
+				Source:     "localport",
+				FilePath:   addr,
+			})
+		}
+	}
+
 	return results
 }
 
