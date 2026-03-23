@@ -1,19 +1,24 @@
 import { useEffect, useRef, useState } from 'react'
 import { useOverlayStore } from '../../store/overlayStore'
 import { SlashMenu, type SlashCommand } from './SlashMenu'
+import { ModelPicker } from './ModelPicker'
+import { MentionHint } from './MentionHint'
 
 interface Props {
   onSubmit: (input: string, slashName?: string, extraVars?: Record<string, string>) => void
 }
 
 export function CommandInput({ onSubmit }: Props) {
-  const { input, setInput, isStreaming } = useOverlayStore()
+  const { input, setInput, isStreaming, activeProvider, setActiveProvider } = useOverlayStore()
 
   const [commands, setCommands] = useState<SlashCommand[]>([])
   const [slashMenuVisible, setSlashMenuVisible] = useState(false)
   const [slashQuery, setSlashQuery] = useState('')
   const [selectedCmd, setSelectedCmd] = useState<SlashCommand | null>(null)
   const [extraVars, setExtraVars] = useState<Record<string, string>>({})
+  const [showModelPicker, setShowModelPicker] = useState(false)
+  const [mentionQuery, setMentionQuery] = useState('')
+  const [showMentionHint, setShowMentionHint] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
@@ -31,6 +36,8 @@ export function CommandInput({ onSubmit }: Props) {
     const value = e.target.value
     setInput(value)
     if (selectedCmd) return
+
+    // Detect slash commands
     if (value.startsWith('/') && !value.includes('\n')) {
       setSlashQuery(value.slice(1))
       setSlashMenuVisible(true)
@@ -38,6 +45,23 @@ export function CommandInput({ onSubmit }: Props) {
       setSlashMenuVisible(false)
       setSlashQuery('')
     }
+
+    // Detect @mention
+    const atMatch = value.match(/@(\w*)$/)
+    if (atMatch) {
+      setMentionQuery(atMatch[1])
+      setShowMentionHint(true)
+    } else {
+      setShowMentionHint(false)
+      setMentionQuery('')
+    }
+  }
+
+  const handleMentionSelect = (alias: string) => {
+    const newInput = input.replace(/@\w*$/, '')
+    setInput(newInput)
+    setActiveProvider(alias)
+    setShowMentionHint(false)
   }
 
   const handleSlashSelect = (cmd: SlashCommand) => {
@@ -61,12 +85,21 @@ export function CommandInput({ onSubmit }: Props) {
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (slashMenuVisible) return
+
+    // Ctrl+M → model picker
+    if (e.key === 'm' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault()
+      setShowModelPicker((v) => !v)
+      return
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       if (!isStreaming) handleSubmit()
     }
     if (e.key === 'Escape') {
-      if (selectedCmd) handleClearSlash()
+      if (showModelPicker) setShowModelPicker(false)
+      else if (selectedCmd) handleClearSlash()
       else window.close()
     }
   }
@@ -84,6 +117,13 @@ export function CommandInput({ onSubmit }: Props) {
 
   return (
     <div className="relative">
+      {showModelPicker && (
+        <ModelPicker
+          onSelect={(name) => setActiveProvider(name)}
+          onClose={() => setShowModelPicker(false)}
+        />
+      )}
+
       <SlashMenu
         commands={commands}
         query={slashQuery}
@@ -122,20 +162,29 @@ export function CommandInput({ onSubmit }: Props) {
         </div>
       )}
 
-      <textarea
-        ref={textareaRef}
-        value={input}
-        onChange={handleChange}
-        onKeyDown={handleKeyDown}
-        placeholder={selectedCmd ? `Nhập nội dung cho /${selectedCmd.slash_name}...` : 'Hỏi AI bất cứ điều gì... (/ để dùng slash command)'}
-        rows={2}
-        disabled={isStreaming}
-        className="w-full bg-transparent text-white placeholder-white/30 resize-none outline-none px-5 py-4 text-sm leading-relaxed disabled:opacity-50"
-      />
+      <div className="relative">
+        <MentionHint query={mentionQuery} onSelect={handleMentionSelect} visible={showMentionHint} />
+        <textarea
+          ref={textareaRef}
+          value={input}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          placeholder={selectedCmd ? `Nhập nội dung cho /${selectedCmd.slash_name}...` : 'Hỏi AI... (/ slash command • @ chọn provider • Ctrl+M model picker)'}
+          rows={2}
+          disabled={isStreaming}
+          className="w-full bg-transparent text-white placeholder-white/30 resize-none outline-none px-5 py-4 text-sm leading-relaxed disabled:opacity-50"
+        />
+      </div>
 
       <div className="px-5 pb-4 flex items-center justify-between">
         <span className="text-xs text-white/20">
-          {isStreaming ? 'Đang xử lý...' : 'Enter để gửi • Shift+Enter xuống dòng • / để slash command'}
+          {activeProvider && (
+            <span className="text-indigo-400 mr-2">
+              @{activeProvider}
+              <button onClick={() => setActiveProvider(null)} className="ml-1 text-white/30 hover:text-white/60">✕</button>
+            </span>
+          )}
+          {isStreaming ? 'Đang xử lý...' : 'Enter gửi • Ctrl+M chọn model • @ mention provider'}
         </span>
         <button
           onClick={handleSubmit}

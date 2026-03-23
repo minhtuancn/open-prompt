@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { useOverlayStore } from '../../store/overlayStore'
+import { FallbackDialog } from './FallbackDialog'
 
 export function ResponsePanel() {
-  const { chunks, isStreaming, error } = useOverlayStore()
+  const { chunks, isStreaming, error, fallbackProviders, setFallbackProviders } = useOverlayStore()
   const text = chunks.join('')
 
   const [isInjecting, setIsInjecting] = useState(false)
@@ -35,11 +36,25 @@ export function ResponsePanel() {
     }
   }
 
+  const handleFallbackRetry = (provider: string) => {
+    window.dispatchEvent(new CustomEvent('fallback-retry', { detail: { provider } }))
+  }
+
   return (
     <div className="px-5 pb-4 max-h-80 overflow-y-auto">
       <div className="border-t border-white/10 pt-3">
         {error ? (
-          <p className="text-red-400 text-sm">{error}</p>
+          <>
+            <p className="text-red-400 text-sm">{error}</p>
+            {fallbackProviders.length > 0 && (
+              <FallbackDialog
+                errorMessage={error}
+                providers={fallbackProviders}
+                onRetry={handleFallbackRetry}
+                onCancel={() => setFallbackProviders([])}
+              />
+            )}
+          </>
         ) : (
           <>
             <p className="text-white/90 text-sm leading-relaxed whitespace-pre-wrap">

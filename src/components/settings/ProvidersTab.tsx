@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { callEngine } from '../../hooks/useEngine'
 import { useAuthStore } from '../../store/authStore'
+import { GatewayForm } from './GatewayForm'
 
 interface Provider {
   id: string
@@ -78,6 +79,15 @@ export function ProvidersTab() {
           )}
         </div>
       ))}
+
+      <div className="mt-4 pt-4 border-t border-white/10">
+        <GatewayForm onAdded={() => {
+          if (!token) return
+          callEngine<Provider[]>('providers.list', { token })
+            .then((list) => setProviders(list ?? []))
+            .catch(console.error)
+        }} />
+      </div>
     </div>
   )
 }

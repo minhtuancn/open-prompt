@@ -22,7 +22,8 @@ const FONT_SIZE_CLASS: Record<string, string> = {
 export default function App() {
   const [state, setState] = useState<AppState>('loading')
   const { token } = useAuthStore()
-  const { reset, appendChunk, setStreaming, setError } = useOverlayStore()
+  const { reset, appendChunk, setStreaming, setError, setFallbackProviders, setLastQuery } = useOverlayStore()
+  const activeProvider = useOverlayStore((s) => s.activeProvider)
   const fontSize = useSettingsStore((s) => s.fontSize)
   const fontSizeClass = FONT_SIZE_CLASS[fontSize]
 
@@ -44,15 +45,45 @@ export default function App() {
     init()
   }, [token])
 
+  // Fallback retry: lắng nghe event từ FallbackDialog
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { provider } = (e as CustomEvent).detail
+      const lastQuery = useOverlayStore.getState().lastQuery
+      if (!token || !lastQuery) return
+      const store = useOverlayStore.getState()
+      store.reset()
+      store.setStreaming(true)
+      store.setLastQuery(lastQuery)
+      streamQuery(
+        { token, input: lastQuery, provider },
+        (chunk) => useOverlayStore.getState().appendChunk(chunk),
+        () => useOverlayStore.getState().setStreaming(false),
+        (err, fallback) => {
+          useOverlayStore.getState().setError(err)
+          useOverlayStore.getState().setStreaming(false)
+          if (fallback && fallback.length > 0) useOverlayStore.getState().setFallbackProviders(fallback)
+        }
+      )
+    }
+    window.addEventListener('fallback-retry', handler)
+    return () => window.removeEventListener('fallback-retry', handler)
+  }, [token])
+
   const handleQuery = async (input: string) => {
     if (!token) return
     reset()
     setStreaming(true)
+    setLastQuery(input)
     await streamQuery(
-      { token, input },
+      { token, input, provider: activeProvider || undefined },
       (chunk) => appendChunk(chunk),
       () => setStreaming(false),
-      (err) => { setError(err); setStreaming(false) }
+      (err, fallback) => {
+        setError(err)
+        setStreaming(false)
+        if (fallback && fallback.length > 0) setFallbackProviders(fallback)
+      }
     )
   }
 
