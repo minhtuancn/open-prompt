@@ -170,6 +170,10 @@ func (r *Router) dispatch(conn net.Conn, req *Request) (interface{}, *RPCError) 
 		return r.handlePluginsToggle(req)
 	case "plugins.uninstall":
 		return r.handlePluginsUninstall(req)
+	case "prompts.export":
+		return r.handlePromptsExport(req)
+	case "prompts.import":
+		return r.handlePromptsImport(req)
 	default:
 		return nil, &RPCError{Code: -32601, Message: fmt.Sprintf("method not found: %s", req.Method)}
 	}
