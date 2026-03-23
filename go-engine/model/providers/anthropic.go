@@ -28,15 +28,22 @@ type CompletionRequest struct {
 
 // AnthropicProvider gọi Anthropic Messages API với streaming
 type AnthropicProvider struct {
-	apiKey string
-	client *http.Client
+	apiKey  string
+	baseURL string
+	client  *http.Client
 }
 
-// NewAnthropicProvider tạo provider mới
+// NewAnthropicProvider tạo provider mới dùng base URL mặc định
 func NewAnthropicProvider(apiKey string) *AnthropicProvider {
+	return NewAnthropicProviderWithBaseURL(apiKey, anthropicBaseURL)
+}
+
+// NewAnthropicProviderWithBaseURL tạo provider với base URL tuỳ chỉnh (dùng cho test)
+func NewAnthropicProviderWithBaseURL(apiKey, baseURL string) *AnthropicProvider {
 	return &AnthropicProvider{
-		apiKey: apiKey,
-		client: &http.Client{Timeout: 60 * time.Second},
+		apiKey:  apiKey,
+		baseURL: baseURL,
+		client:  &http.Client{Timeout: 60 * time.Second},
 	}
 }
 
@@ -66,7 +73,7 @@ func (p *AnthropicProvider) StreamComplete(ctx context.Context, req CompletionRe
 		return fmt.Errorf("marshal request: %w", err)
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", anthropicBaseURL+"/messages", bytes.NewReader(bodyBytes))
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", p.baseURL+"/messages", bytes.NewReader(bodyBytes))
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}
