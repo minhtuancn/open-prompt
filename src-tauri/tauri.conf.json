@@ -1,6 +1,6 @@
 {
   "productName": "open-prompt",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "identifier": "com.minhtuancn.open-prompt",
   "build": {
     "frontendDist": "../dist",
@@ -44,6 +44,15 @@
     "active": true,
     "targets": "all",
     "icon": ["icons/icon.png"],
-    "externalBin": ["binaries/go-engine"]
+    "externalBin": ["binaries/go-engine"],
+    "macOS": {
+      "signingIdentity": null,
+      "entitlements": null
+    },
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "http://timestamp.digicert.com"
+    }
   }
 }

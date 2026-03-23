@@ -22,14 +22,112 @@ const TERMINAL_APPS: &[&str] = &[
     "foot",
 ];
 
+/// strip_markdown loại bỏ markdown formatting, giữ nội dung text thuần
+fn strip_markdown(text: &str) -> String {
+    let mut result = String::with_capacity(text.len());
+    let mut in_code_block = false;
+    let mut code_block_content = String::new();
+
+    for line in text.lines() {
+        if line.starts_with("```") {
+            if in_code_block {
+                // Kết thúc code block — giữ nội dung code, bỏ ```
+                result.push_str(&code_block_content);
+                code_block_content.clear();
+                in_code_block = false;
+            } else {
+                in_code_block = true;
+            }
+            continue;
+        }
+
+        if in_code_block {
+            if !code_block_content.is_empty() {
+                code_block_content.push('\n');
+            }
+            code_block_content.push_str(line);
+            continue;
+        }
+
+        // Strip heading markers: ### heading → heading
+        let stripped = if line.starts_with("### ") {
+            &line[4..]
+        } else if line.starts_with("## ") {
+            &line[3..]
+        } else if line.starts_with("# ") {
+            &line[2..]
+        } else if line.starts_with("- ") || line.starts_with("* ") {
+            // Giữ list nhưng bỏ marker, thêm bullet
+            let content = &line[2..];
+            if !result.is_empty() {
+                result.push('\n');
+            }
+            result.push_str("  ");
+            result.push_str(content);
+            continue;
+        } else {
+            line
+        };
+
+        // Strip inline markdown: **bold** → bold, *italic* → italic, `code` → code
+        let clean = strip_inline_markdown(stripped);
+
+        if !result.is_empty() {
+            result.push('\n');
+        }
+        result.push_str(&clean);
+    }
+
+    // Code block không đóng
+    if in_code_block && !code_block_content.is_empty() {
+        if !result.is_empty() {
+            result.push('\n');
+        }
+        result.push_str(&code_block_content);
+    }
+
+    result
+}
+
+/// strip_inline_markdown loại bỏ **bold**, *italic*, `code`
+fn strip_inline_markdown(text: &str) -> String {
+    let mut s = text.to_string();
+    // Bold: **text** → text
+    while let (Some(start), Some(end)) = (s.find("**"), s[s.find("**").unwrap_or(0) + 2..].find("**")) {
+        let inner_start = start + 2;
+        let inner_end = inner_start + end;
+        let inner = s[inner_start..inner_end].to_string();
+        s = format!("{}{}{}", &s[..start], inner, &s[inner_end + 2..]);
+    }
+    // Inline code: `text` → text
+    while let (Some(start), Some(end)) = (s.find('`'), s[s.find('`').unwrap_or(0) + 1..].find('`')) {
+        let inner_start = start + 1;
+        let inner_end = inner_start + end;
+        let inner = s[inner_start..inner_end].to_string();
+        s = format!("{}{}{}", &s[..start], inner, &s[inner_end + 1..]);
+    }
+    // Italic: *text* → text (chỉ single *)
+    while let (Some(start), Some(end)) = (s.find('*'), s[s.find('*').unwrap_or(0) + 1..].find('*')) {
+        let inner_start = start + 1;
+        let inner_end = inner_start + end;
+        let inner = s[inner_start..inner_end].to_string();
+        s = format!("{}{}{}", &s[..start], inner, &s[inner_end + 1..]);
+    }
+    s
+}
+
 /// inject_text inject text vào app đang focus.
 /// Nếu app là terminal → dùng typing (tránh paste issue).
 /// Nếu app khác → clipboard paste với backup/restore.
+/// Tự động strip markdown formatting trước khi inject.
 #[command]
 pub async fn inject_text(app: AppHandle, text: String) -> Result<String, String> {
     if text.is_empty() {
         return Ok("empty".to_string());
     }
+
+    // Strip markdown trước khi inject
+    let text = strip_markdown(&text);
 
     // Lấy context focused app
     let is_terminal = {

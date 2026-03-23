@@ -22,25 +22,27 @@
 - [x] Conversations (multi-turn)
 - [x] Build scripts
 
-## Kế hoạch
-
 ### v0.3.0 — Production Polish
-- [ ] OAuth WebView hoàn chỉnh (Google, GitHub Device Flow)
-- [ ] Tauri auto-updater integration
-- [ ] Code signing (Windows Authenticode, macOS notarization)
-- [ ] Conversation context trong query (multi-turn streaming)
-- [ ] Drag-drop model priority trong ProvidersTab
-- [ ] Token expiry watcher + auto-refresh
+- [x] OAuth WebView hoàn chỉnh (Google, GitHub Device Flow)
+- [x] Tauri auto-updater integration
+- [x] Code signing config (Windows Authenticode, macOS notarization)
+- [x] Conversation context trong query (multi-turn streaming)
+- [x] Drag-drop model priority trong ProvidersTab
+- [x] Token expiry watcher + callback
 
 ### v0.4.0 — Advanced Features
-- [ ] Plugin system (custom providers, custom skills)
-- [ ] Prompt sharing + import/export
-- [ ] Rich text injection (Markdown → HTML)
-- [ ] Keyboard shortcut customization
-- [ ] Usage analytics daily aggregation (usage_daily table)
+- [x] Plugin system (custom providers, custom skills)
+- [x] Prompt sharing + import/export
+- [x] Rich text injection (strip Markdown trước inject)
+- [x] Keyboard shortcut customization
+- [x] Usage analytics daily aggregation (usage_daily table)
+
+## Kế hoạch
 
 ### v1.0.0 — Public Release
-- [ ] Public repo release workflow
-- [ ] Documentation site
-- [ ] Installer cho Windows/macOS/Linux
+- [ ] Public repo release workflow (GitHub Actions + artifacts)
+- [ ] Documentation site (Vitepress/Docusaurus)
+- [ ] Installer cho Windows/macOS/Linux (.msi, .dmg, .deb/.AppImage)
 - [ ] Community prompts marketplace
+- [ ] Onboarding wizard cho first-run
+- [ ] Telemetry opt-in + crash reporting
