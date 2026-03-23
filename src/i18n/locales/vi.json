@@ -24,5 +24,10 @@
   "providers.disconnected": "Chưa kết nối",
   "providers.saveKey": "Lưu API Key",
   "language.vi": "Tiếng Việt",
-  "language.en": "English"
+  "language.en": "English",
+  "language.fr": "Français",
+  "language.zh-CN": "中文",
+  "language.th": "ไทย",
+  "language.lo": "ລາວ",
+  "language.ru": "Русский"
 }
