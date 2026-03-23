@@ -129,6 +129,12 @@ func (r *Router) dispatch(conn net.Conn, req *Request) (interface{}, *RPCError) 
 		return r.handleHistoryList(req)
 	case "history.search":
 		return r.handleHistorySearch(req)
+	case "providers.oauth_start":
+		return r.handleOAuthStart(req)
+	case "providers.oauth_finish":
+		return r.handleOAuthFinish(req)
+	case "providers.oauth_poll":
+		return r.handleOAuthPoll(req)
 	default:
 		return nil, &RPCError{Code: -32601, Message: fmt.Sprintf("method not found: %s", req.Method)}
 	}
