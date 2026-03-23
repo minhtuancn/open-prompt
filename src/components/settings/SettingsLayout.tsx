@@ -50,7 +50,7 @@ export function SettingsLayout({ onClose }: Props) {
   }
 
   return (
-    <div className="flex flex-col" style={{ maxHeight: '600px' }}>
+    <div className="flex flex-col max-h-[600px]">
       <div className="flex items-center justify-between px-5 py-3 border-b border-white/10 shrink-0">
         <span className="text-sm font-semibold text-white">Cài đặt</span>
         <button onClick={onClose} className="text-white/40 hover:text-white transition-colors text-xl leading-none">×</button>

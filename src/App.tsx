@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { callEngine, streamQuery } from './hooks/useEngine'
 import { useAuthStore } from './store/authStore'
 import { useOverlayStore } from './store/overlayStore'
+import { useSettingsStore } from './store/settingsStore'
 import { CreateAccount } from './components/onboarding/CreateAccount'
 import { LoginScreen } from './components/auth/LoginScreen'
 import { CommandInput } from './components/overlay/CommandInput'
@@ -16,6 +17,8 @@ export default function App() {
   const [state, setState] = useState<AppState>('loading')
   const { token } = useAuthStore()
   const { reset, appendChunk, setStreaming, setError } = useOverlayStore()
+  const fontSize = useSettingsStore((s) => s.fontSize)
+  const fontSizeClass = { sm: 'text-sm', base: 'text-base', lg: 'text-lg' }[fontSize]
 
   useEffect(() => {
     async function init() {
@@ -69,14 +72,14 @@ export default function App() {
 
   if (state === 'settings') {
     return (
-      <div className="bg-surface/95 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden">
+      <div className={`bg-surface/95 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden ${fontSizeClass}`}>
         <SettingsLayout onClose={() => setState('overlay')} />
       </div>
     )
   }
 
   return (
-    <div className="bg-surface/95 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden min-h-16">
+    <div className={`bg-surface/95 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden min-h-16 ${fontSizeClass}`}>
       <div className="flex items-start">
         <div className="flex-1 min-w-0">
           <CommandInput onSubmit={handleQuery} />

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { callEngine } from '../../hooks/useEngine'
+import { useAuthStore } from '../../store/authStore'
 
 interface Provider {
   id: string
@@ -9,25 +10,25 @@ interface Provider {
 }
 
 export function ProvidersTab() {
+  const token = useAuthStore((s) => s.token)
   const [providers, setProviders] = useState<Provider[]>([])
   const [apiKeys, setApiKeys] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState<Record<string, boolean>>({})
   const [saved, setSaved] = useState<Record<string, boolean>>({})
+  const [error, setError] = useState<string>('')
 
   useEffect(() => {
-    const token = localStorage.getItem('auth_token')
     if (!token) return
     callEngine<Provider[]>('providers.list', { token })
       .then((list) => setProviders(list ?? []))
-      .catch(console.error)
-  }, [])
+      .catch((e) => setError(String(e)))
+  }, [token])
 
   const handleSaveKey = async (providerId: string) => {
-    const token = localStorage.getItem('auth_token')
     if (!token || !apiKeys[providerId]) return
     setSaving((p) => ({ ...p, [providerId]: true }))
     try {
-      await callEngine('providers.connect', { token, provider_id: providerId, api_key: apiKeys[providerId] })
+      await callEngine('providers.connect', { token, provider_id: providerId, api_key: apiKeys[providerId]! })
       setSaved((p) => ({ ...p, [providerId]: true }))
       setProviders((prev) => prev.map((p) => p.id === providerId ? { ...p, connected: true } : p))
       setTimeout(() => setSaved((p) => ({ ...p, [providerId]: false })), 2000)
@@ -41,6 +42,7 @@ export function ProvidersTab() {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-xs text-white/40">Nhập API key để kết nối AI provider.</p>
+      {error && <p className="text-xs text-red-400 mb-2">{error}</p>}
       {providers.map((provider) => (
         <div key={provider.id} className="bg-white/5 border border-white/10 rounded-xl p-4">
           <div className="flex items-center justify-between mb-3">

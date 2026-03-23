@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { callEngine } from '../../hooks/useEngine'
+import { useAuthStore } from '../../store/authStore'
 
 interface Skill {
   id: number
@@ -17,24 +18,27 @@ interface Props {
 }
 
 export function SkillList({ onEdit, onNew, refreshSignal }: Props) {
+  const token = useAuthStore((s) => s.token)
   const [skills, setSkills] = useState<Skill[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const token = localStorage.getItem('auth_token')
     if (!token) return
     setLoading(true)
     callEngine<{ skills: Skill[] }>('skills.list', { token })
       .then((res) => setSkills(res.skills ?? []))
       .catch(console.error)
       .finally(() => setLoading(false))
-  }, [refreshSignal])
+  }, [refreshSignal, token])
 
   const handleDelete = async (id: number) => {
-    const token = localStorage.getItem('auth_token')
     if (!token || !confirm('Xóa skill này?')) return
-    await callEngine('skills.delete', { token, id })
-    setSkills((prev) => prev.filter((s) => s.id !== id))
+    try {
+      await callEngine('skills.delete', { token, id })
+      setSkills((prev) => prev.filter((s) => s.id !== id))
+    } catch (e) {
+      alert('Xóa thất bại: ' + String(e))
+    }
   }
 
   if (loading) {
