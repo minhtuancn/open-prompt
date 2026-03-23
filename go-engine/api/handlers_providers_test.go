@@ -201,3 +201,66 @@ func TestProvidersSetPriority(t *testing.T) {
 		t.Errorf("expected ok=true, got %v", m["ok"])
 	}
 }
+
+func TestProvidersAddGateway(t *testing.T) {
+	_, addr := setupServer(t)
+	token := registerAndLogin(t, addr, "gwuser", "pass12345678")
+
+	resp := callRPC(t, addr, "test-secret-16chars", "providers.add_gateway", map[string]interface{}{
+		"token":         token,
+		"name":          "my-ollama",
+		"display_name":  "My Ollama",
+		"base_url":      "http://localhost:11434/v1",
+		"default_model": "llama3",
+	})
+	if resp.Error != nil {
+		t.Fatalf("error: %v", resp.Error)
+	}
+	result := resultMap(t, resp)
+	if result["ok"] != true {
+		t.Errorf("ok=%v, want true", result["ok"])
+	}
+}
+
+func TestProvidersAddGatewayMissingName(t *testing.T) {
+	_, addr := setupServer(t)
+	token := registerAndLogin(t, addr, "gwuser2", "pass12345678")
+
+	resp := callRPC(t, addr, "test-secret-16chars", "providers.add_gateway", map[string]interface{}{
+		"token":    token,
+		"base_url": "http://localhost:11434/v1",
+	})
+	if resp.Error == nil || resp.Error.Code != -32602 {
+		t.Errorf("expected error -32602, got %v", resp.Error)
+	}
+}
+
+func TestProvidersValidateNotFound(t *testing.T) {
+	_, addr := setupServer(t)
+	token := registerAndLogin(t, addr, "valuser", "pass12345678")
+
+	resp := callRPC(t, addr, "test-secret-16chars", "providers.validate", map[string]interface{}{
+		"token": token,
+		"name":  "nonexistent",
+	})
+	if resp.Error == nil {
+		t.Error("expected error for unknown provider")
+	}
+}
+
+func TestProvidersRemove(t *testing.T) {
+	_, addr := setupServer(t)
+	token := registerAndLogin(t, addr, "rmuser", "pass12345678")
+
+	resp := callRPC(t, addr, "test-secret-16chars", "providers.remove", map[string]interface{}{
+		"token": token,
+		"name":  "anthropic",
+	})
+	if resp.Error != nil {
+		t.Fatalf("error: %v", resp.Error)
+	}
+	result := resultMap(t, resp)
+	if result["ok"] != true {
+		t.Errorf("ok=%v, want true", result["ok"])
+	}
+}

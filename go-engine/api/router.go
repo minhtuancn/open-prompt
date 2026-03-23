@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net"
+	"os"
 
 	"github.com/minhtuancn/open-prompt/go-engine/auth"
 	"github.com/minhtuancn/open-prompt/go-engine/db/repos"
@@ -38,9 +39,10 @@ func newRouter(s *Server) (*Router, error) {
 	tokenRepo := repos.NewProviderTokenRepo(s.db)
 	priorityRepo := repos.NewModelPriorityRepo(s.db)
 	registry := provider.DefaultRegistry()
-	// Provider routing registry — Phase 2A1
-	// TODO: Phase 2A2 sẽ register providers dựa trên detected tokens
+	// Provider routing registry — auto-register từ DB tokens + env vars
 	providerReg := providers.NewRegistry()
+	registerProvidersFromDB(providerReg, tokenRepo)
+	registerProvidersFromEnv(providerReg)
 	kc := provider.NewKeychain(provider.KeychainServiceName)
 	tokenManager := provider.NewTokenManager(kc, tokenRepo, registry)
 	// Derive JWT secret từ socket secret bằng HMAC-SHA256.
@@ -117,7 +119,64 @@ func (r *Router) dispatch(conn net.Conn, req *Request) (interface{}, *RPCError) 
 		return r.handleAnalyticsSummary(req)
 	case "analytics.by_provider":
 		return r.handleAnalyticsByProvider(req)
+	case "providers.add_gateway":
+		return r.handleProvidersAddGateway(req)
+	case "providers.validate":
+		return r.handleProvidersValidate(req)
+	case "providers.remove":
+		return r.handleProvidersRemove(req)
 	default:
 		return nil, &RPCError{Code: -32601, Message: fmt.Sprintf("method not found: %s", req.Method)}
+	}
+}
+
+// registerProvidersFromDB đăng ký providers từ saved tokens trong DB
+func registerProvidersFromDB(reg *providers.Registry, tokenRepo *repos.ProviderTokenRepo) {
+	// Lấy system-level tokens (user_id = 0) và user tokens
+	for _, userID := range []int64{0, 1} {
+		tokens, err := tokenRepo.GetByUser(userID)
+		if err != nil {
+			continue
+		}
+		for _, tok := range tokens {
+			// Bỏ qua nếu đã register
+			if _, err := reg.Route(tok.ProviderID); err == nil {
+				continue
+			}
+			switch tok.ProviderID {
+			case "anthropic":
+				reg.Register(providers.NewAnthropicProvider(tok.KeychainKey))
+			case "openai":
+				reg.Register(providers.NewOpenAIProvider(tok.KeychainKey, ""))
+			case "gemini":
+				reg.Register(providers.NewGeminiProvider(tok.KeychainKey))
+			case "copilot":
+				reg.Register(providers.NewCopilotProvider(tok.KeychainKey))
+			case "ollama":
+				reg.Register(providers.NewOllamaProvider(""))
+			}
+		}
+	}
+}
+
+// registerProvidersFromEnv đăng ký providers từ env vars (nếu chưa có trong DB)
+func registerProvidersFromEnv(reg *providers.Registry) {
+	envProviders := []struct {
+		envKey string
+		name   string
+		create func(key string) providers.Provider
+	}{
+		{"ANTHROPIC_API_KEY", "anthropic", func(k string) providers.Provider { return providers.NewAnthropicProvider(k) }},
+		{"OPENAI_API_KEY", "openai", func(k string) providers.Provider { return providers.NewOpenAIProvider(k, "") }},
+		{"GEMINI_API_KEY", "gemini", func(k string) providers.Provider { return providers.NewGeminiProvider(k) }},
+	}
+
+	for _, ep := range envProviders {
+		if _, err := reg.Route(ep.name); err == nil {
+			continue // đã register từ DB
+		}
+		if key := os.Getenv(ep.envKey); key != "" {
+			reg.Register(ep.create(key))
+		}
 	}
 }

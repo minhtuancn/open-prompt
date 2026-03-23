@@ -1,10 +1,13 @@
 package api
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"github.com/minhtuancn/open-prompt/go-engine/auth"
 	"github.com/minhtuancn/open-prompt/go-engine/db/repos"
+	"github.com/minhtuancn/open-prompt/go-engine/model/providers"
 	"github.com/minhtuancn/open-prompt/go-engine/provider"
 )
 
@@ -172,6 +175,111 @@ func (r *Router) handleProvidersSetPriority(req *Request) (interface{}, *RPCErro
 	if err := r.priorityRepo.SetChain(claims.UserID, chain); err != nil {
 		return nil, &RPCError{Code: ErrInternal.Code, Message: fmt.Sprintf("lỗi cập nhật priority: %v", err)}
 	}
+
+	return map[string]interface{}{"ok": true}, nil
+}
+
+// handleProvidersAddGateway thêm custom gateway
+func (r *Router) handleProvidersAddGateway(req *Request) (interface{}, *RPCError) {
+	claims, rpcErr := r.requireAuth(req)
+	if rpcErr != nil {
+		return nil, rpcErr
+	}
+
+	var p struct {
+		Token        string   `json:"token"`
+		Name         string   `json:"name"`
+		DisplayName  string   `json:"display_name"`
+		BaseURL      string   `json:"base_url"`
+		APIKey       string   `json:"api_key"`
+		DefaultModel string   `json:"default_model"`
+		Aliases      []string `json:"aliases"`
+	}
+	if err := decodeParams(req.Params, &p); err != nil || p.Name == "" || p.BaseURL == "" {
+		return nil, &RPCError{Code: ErrInvalidParams.Code, Message: "name và base_url bắt buộc"}
+	}
+
+	displayName := p.DisplayName
+	if displayName == "" {
+		displayName = p.Name
+	}
+
+	gw := providers.NewGatewayProvider(p.Name, displayName, p.BaseURL, p.APIKey, p.DefaultModel, p.Aliases)
+	r.providerRegistry.Register(gw)
+
+	_, err := r.server.db.Exec(
+		`INSERT INTO custom_gateways (user_id, name, display_name, base_url, api_key, default_model, aliases)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		claims.UserID, p.Name, displayName, p.BaseURL, p.APIKey, p.DefaultModel, "[]",
+	)
+	if err != nil {
+		return nil, &RPCError{Code: ErrInternal.Code, Message: fmt.Sprintf("save gateway: %v", err)}
+	}
+
+	return map[string]interface{}{"ok": true, "name": p.Name}, nil
+}
+
+// handleProvidersValidate kiểm tra provider có hoạt động không
+func (r *Router) handleProvidersValidate(req *Request) (interface{}, *RPCError) {
+	_, rpcErr := r.requireAuth(req)
+	if rpcErr != nil {
+		return nil, rpcErr
+	}
+
+	var p struct {
+		Token string `json:"token"`
+		Name  string `json:"name"`
+	}
+	if err := decodeParams(req.Params, &p); err != nil || p.Name == "" {
+		return nil, &RPCError{Code: ErrInvalidParams.Code, Message: "name bắt buộc"}
+	}
+
+	prov, err := r.providerRegistry.Route(p.Name)
+	if err != nil {
+		return nil, &RPCError{Code: ErrProviderNotFound.Code, Message: err.Error()}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	validateErr := prov.Validate(ctx)
+	latency := time.Since(start).Milliseconds()
+
+	result := map[string]interface{}{
+		"name":       prov.Name(),
+		"valid":      validateErr == nil,
+		"latency_ms": latency,
+	}
+	if validateErr != nil {
+		result["error"] = validateErr.Error()
+	}
+	if validateErr == nil {
+		if models, mErr := prov.Models(ctx); mErr == nil {
+			result["models"] = models
+		}
+	}
+
+	return result, nil
+}
+
+// handleProvidersRemove xóa provider
+func (r *Router) handleProvidersRemove(req *Request) (interface{}, *RPCError) {
+	claims, rpcErr := r.requireAuth(req)
+	if rpcErr != nil {
+		return nil, rpcErr
+	}
+
+	var p struct {
+		Token string `json:"token"`
+		Name  string `json:"name"`
+	}
+	if err := decodeParams(req.Params, &p); err != nil || p.Name == "" {
+		return nil, &RPCError{Code: ErrInvalidParams.Code, Message: "name bắt buộc"}
+	}
+
+	_ = r.tokenRepo.Delete(claims.UserID, p.Name)
+	_, _ = r.server.db.Exec("DELETE FROM custom_gateways WHERE user_id = ? AND name = ?", claims.UserID, p.Name)
 
 	return map[string]interface{}{"ok": true}, nil
 }
