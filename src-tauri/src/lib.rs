@@ -1,4 +1,5 @@
 mod hotkey;
+mod injection;
 mod ipc;
 mod sidecar;
 mod tray;
@@ -12,7 +13,10 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .manage(SidecarState(std::sync::Mutex::new(None)))
         .manage(EnginePort(0))
-        .invoke_handler(tauri::generate_handler![ipc::call_engine])
+        .invoke_handler(tauri::generate_handler![
+            ipc::call_engine,
+            injection::inject_text,
+        ])
         .setup(|app| {
             sidecar::spawn_engine(app.handle())
                 .expect("failed to spawn go engine");
