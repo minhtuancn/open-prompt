@@ -14,11 +14,11 @@ func (r *Router) requireAuth(req *Request) (*auth.Claims, *RPCError) {
 		Token string `json:"token"`
 	}
 	if err := decodeParams(req.Params, &p); err != nil || p.Token == "" {
-		return nil, &RPCError{Code: -32001, Message: "token bắt buộc"}
+		return nil, &RPCError{Code: ErrUnauthorized.Code, Message: "token bắt buộc"}
 	}
 	claims, err := r.auth.ValidateToken(p.Token)
 	if err != nil {
-		return nil, &RPCError{Code: -32001, Message: "token không hợp lệ"}
+		return nil, &RPCError{Code: ErrUnauthorized.Code, Message: "token không hợp lệ"}
 	}
 	return claims, nil
 }
@@ -30,10 +30,9 @@ func (r *Router) handleProvidersList(req *Request) (interface{}, *RPCError) {
 		return nil, rpcErr
 	}
 
-	tokenRepo := repos.NewProviderTokenRepo(r.server.db)
-	dbTokens, err := tokenRepo.GetByUser(claims.UserID)
+	dbTokens, err := r.tokenRepo.GetByUser(claims.UserID)
 	if err != nil {
-		return nil, &RPCError{Code: -32000, Message: fmt.Sprintf("lỗi đọc DB: %v", err)}
+		return nil, &RPCError{Code: ErrInternal.Code, Message: fmt.Sprintf("lỗi đọc DB: %v", err)}
 	}
 
 	connected := make(map[string]bool)
@@ -41,7 +40,7 @@ func (r *Router) handleProvidersList(req *Request) (interface{}, *RPCError) {
 		connected[t.ProviderID] = true
 	}
 
-	reg := provider.DefaultRegistry()
+	reg := r.registry
 
 	type ModelStatus struct {
 		ID             string  `json:"id"`
@@ -128,19 +127,14 @@ func (r *Router) handleProvidersConnect(req *Request) (interface{}, *RPCError) {
 		APIKey     string `json:"api_key"`
 	}
 	if err := decodeParams(req.Params, &params); err != nil {
-		return nil, &RPCError{Code: -32602, Message: "params không hợp lệ"}
+		return nil, &RPCError{Code: ErrInvalidParams.Code, Message: "params không hợp lệ"}
 	}
 	if params.ProviderID == "" {
-		return nil, &RPCError{Code: -32602, Message: "provider_id không được để trống"}
+		return nil, &RPCError{Code: ErrInvalidParams.Code, Message: "provider_id không được để trống"}
 	}
 
-	kc := provider.NewKeychain("open-prompt")
-	tokenRepo := repos.NewProviderTokenRepo(r.server.db)
-	reg := provider.DefaultRegistry()
-	tm := provider.NewTokenManager(kc, tokenRepo, reg)
-
-	if err := tm.SaveToken(claims.UserID, params.ProviderID, params.APIKey); err != nil {
-		return nil, &RPCError{Code: -32000, Message: fmt.Sprintf("lưu token thất bại: %v", err)}
+	if err := r.tokenManager.SaveToken(claims.UserID, params.ProviderID, params.APIKey); err != nil {
+		return nil, &RPCError{Code: ErrInternal.Code, Message: fmt.Sprintf("lưu token thất bại: %v", err)}
 	}
 
 	return map[string]interface{}{"ok": true, "provider_id": params.ProviderID}, nil
@@ -162,10 +156,8 @@ func (r *Router) handleProvidersSetPriority(req *Request) (interface{}, *RPCErro
 		} `json:"chain"`
 	}
 	if err := decodeParams(req.Params, &params); err != nil {
-		return nil, &RPCError{Code: -32602, Message: "params không hợp lệ"}
+		return nil, &RPCError{Code: ErrInvalidParams.Code, Message: "params không hợp lệ"}
 	}
-
-	prioRepo := repos.NewModelPriorityRepo(r.server.db)
 
 	var chain []repos.ModelPriority
 	for _, item := range params.Chain {
@@ -177,8 +169,8 @@ func (r *Router) handleProvidersSetPriority(req *Request) (interface{}, *RPCErro
 		})
 	}
 
-	if err := prioRepo.SetChain(claims.UserID, chain); err != nil {
-		return nil, &RPCError{Code: -32000, Message: fmt.Sprintf("lỗi cập nhật priority: %v", err)}
+	if err := r.priorityRepo.SetChain(claims.UserID, chain); err != nil {
+		return nil, &RPCError{Code: ErrInternal.Code, Message: fmt.Sprintf("lỗi cập nhật priority: %v", err)}
 	}
 
 	return map[string]interface{}{"ok": true}, nil

@@ -9,21 +9,31 @@ import (
 
 	"github.com/minhtuancn/open-prompt/go-engine/auth"
 	"github.com/minhtuancn/open-prompt/go-engine/db/repos"
+	"github.com/minhtuancn/open-prompt/go-engine/provider"
 )
 
 // Router map method → handler
 type Router struct {
-	server   *Server
-	auth     *auth.Service
-	users    *repos.UserRepo
-	settings *repos.SettingsRepo
-	prompts  *repos.PromptRepo
+	server       *Server
+	auth         *auth.Service
+	users        *repos.UserRepo
+	settings     *repos.SettingsRepo
+	prompts      *repos.PromptRepo
+	tokenRepo    *repos.ProviderTokenRepo
+	priorityRepo *repos.ModelPriorityRepo
+	tokenManager *provider.TokenManager
+	registry     *provider.Registry
 }
 
 func newRouter(s *Server) (*Router, error) {
 	users := repos.NewUserRepo(s.db)
 	settings := repos.NewSettingsRepo(s.db)
 	prompts := repos.NewPromptRepo(s.db)
+	tokenRepo := repos.NewProviderTokenRepo(s.db)
+	priorityRepo := repos.NewModelPriorityRepo(s.db)
+	registry := provider.DefaultRegistry()
+	kc := provider.NewKeychain(provider.KeychainServiceName)
+	tokenManager := provider.NewTokenManager(kc, tokenRepo, registry)
 	// Derive JWT secret từ socket secret bằng HMAC-SHA256.
 	// Mỗi session có socket secret ngẫu nhiên → JWT secret cũng unique per-session.
 	mac := hmac.New(sha256.New, []byte(s.secret))
@@ -34,11 +44,15 @@ func newRouter(s *Server) (*Router, error) {
 		return nil, fmt.Errorf("create auth service: %w", err)
 	}
 	return &Router{
-		server:   s,
-		auth:     authSvc,
-		users:    users,
-		settings: settings,
-		prompts:  prompts,
+		server:       s,
+		auth:         authSvc,
+		users:        users,
+		settings:     settings,
+		prompts:      prompts,
+		tokenRepo:    tokenRepo,
+		priorityRepo: priorityRepo,
+		tokenManager: tokenManager,
+		registry:     registry,
 	}, nil
 }
 

@@ -6,6 +6,9 @@ import (
 	keyring "github.com/zalando/go-keyring"
 )
 
+// KeychainServiceName là service name dùng để nhóm tất cả tokens trong system keychain
+const KeychainServiceName = "open-prompt"
+
 // ErrNotFound là lỗi khi key không tìm thấy trong keychain
 var ErrNotFound = errors.New("key not found in keychain")
 

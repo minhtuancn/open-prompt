@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { useOverlayStore } from '../../store/overlayStore'
 
@@ -9,6 +9,13 @@ export function ResponsePanel() {
   const [isInjecting, setIsInjecting] = useState(false)
   const [injectError, setInjectError] = useState<string | null>(null)
   const [injected, setInjected] = useState(false)
+  const injectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (injectTimerRef.current) clearTimeout(injectTimerRef.current)
+    }
+  }, [])
 
   if (!text && !isStreaming && !error) return null
 
@@ -20,7 +27,7 @@ export function ResponsePanel() {
     try {
       await invoke('inject_text', { text })
       setInjected(true)
-      setTimeout(() => setInjected(false), 2000)
+      injectTimerRef.current = setTimeout(() => setInjected(false), 2000)
     } catch (err) {
       setInjectError(err as string)
     } finally {

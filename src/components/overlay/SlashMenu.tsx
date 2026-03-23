@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Fuse from 'fuse.js'
 
 export interface SlashCommand {
@@ -29,11 +29,11 @@ export function SlashMenu({ commands, query, onSelect, onClose, visible }: Props
   const [activeIndex, setActiveIndex] = useState(0)
   const listRef = useRef<HTMLDivElement>(null)
 
-  const filtered = (() => {
-    if (!query) return commands
-    const fuse = new Fuse(commands, fuseOptions)
-    return fuse.search(query).map(r => r.item)
-  })()
+  const fuse = useMemo(() => new Fuse(commands, fuseOptions), [commands])
+  const filtered = useMemo(
+    () => query ? fuse.search(query).map(r => r.item) : commands,
+    [fuse, query, commands],
+  )
 
   useEffect(() => {
     setActiveIndex(0)
