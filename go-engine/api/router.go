@@ -28,6 +28,7 @@ type Router struct {
 	tokenManager     *provider.TokenManager
 	registry         *provider.Registry
 	providerRegistry *providers.Registry
+	conversations    *repos.ConversationRepo
 }
 
 func newRouter(s *Server) (*Router, error) {
@@ -38,6 +39,7 @@ func newRouter(s *Server) (*Router, error) {
 	history := repos.NewHistoryRepo(s.db)
 	tokenRepo := repos.NewProviderTokenRepo(s.db)
 	priorityRepo := repos.NewModelPriorityRepo(s.db)
+	conversations := repos.NewConversationRepo(s.db)
 	registry := provider.DefaultRegistry()
 	// Provider routing registry — auto-register từ DB tokens + env vars
 	providerReg := providers.NewRegistry()
@@ -67,6 +69,7 @@ func newRouter(s *Server) (*Router, error) {
 		tokenManager:     tokenManager,
 		registry:         registry,
 		providerRegistry: providerReg,
+		conversations:    conversations,
 	}, nil
 }
 
@@ -135,6 +138,14 @@ func (r *Router) dispatch(conn net.Conn, req *Request) (interface{}, *RPCError) 
 		return r.handleOAuthFinish(req)
 	case "providers.oauth_poll":
 		return r.handleOAuthPoll(req)
+	case "conversations.list":
+		return r.handleConversationsList(req)
+	case "conversations.create":
+		return r.handleConversationsCreate(req)
+	case "conversations.messages":
+		return r.handleConversationsMessages(req)
+	case "conversations.delete":
+		return r.handleConversationsDelete(req)
 	default:
 		return nil, &RPCError{Code: -32601, Message: fmt.Sprintf("method not found: %s", req.Method)}
 	}
