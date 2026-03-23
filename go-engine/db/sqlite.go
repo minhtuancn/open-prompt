@@ -14,6 +14,9 @@ import (
 //go:embed migrations/001_init.sql
 var initSQL string
 
+//go:embed migrations/003_multi_provider.sql
+var multiProviderSQL string
+
 // DB wraps sql.DB
 type DB struct {
 	*sql.DB
@@ -57,7 +60,10 @@ func openPath(path string) (*DB, error) {
 func Migrate(db *DB) error {
 	_, err := db.Exec(initSQL)
 	if err != nil {
-		return fmt.Errorf("migration failed: %w", err)
+		return fmt.Errorf("migration 001 failed: %w", err)
+	}
+	if _, err := db.Exec(multiProviderSQL); err != nil {
+		return fmt.Errorf("migration 003 failed: %w", err)
 	}
 	return nil
 }
