@@ -14,7 +14,7 @@ import (
 const (
 	minPasswordLen = 8
 	// bcrypt silently truncate ở 72 bytes → enforce ở layer application
-	maxPasswordLen = 72
+	MaxPasswordLen = 72
 	maxUsernameLen = 64
 )
 
@@ -59,7 +59,7 @@ func (s *Service) Register(username, password string) (*repos.User, error) {
 	if len(password) < minPasswordLen {
 		return nil, ErrPasswordTooShort
 	}
-	if len(password) > maxPasswordLen {
+	if len(password) > MaxPasswordLen {
 		return nil, ErrPasswordTooLong
 	}
 

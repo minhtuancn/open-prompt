@@ -2,6 +2,7 @@ package auth_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/minhtuancn/open-prompt/go-engine/auth"
@@ -99,12 +100,7 @@ func TestRegisterPasswordValidation(t *testing.T) {
 	}
 
 	// Password quá dài (> 72 bytes — bcrypt truncation risk)
-	longPwd := string(make([]byte, 73))
-	for i := range longPwd {
-		longPwd = "a"
-		_ = i
-	}
-	longPwd = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" // 73 'a'
+	longPwd := strings.Repeat("a", auth.MaxPasswordLen+1)
 	_, err = svc.Register("user2", longPwd)
 	if !errors.Is(err, auth.ErrPasswordTooLong) {
 		t.Errorf("expected ErrPasswordTooLong for 73-char password, got %v", err)

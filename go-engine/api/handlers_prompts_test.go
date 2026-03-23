@@ -5,6 +5,19 @@ import (
 	"testing"
 )
 
+func promptFromResult(t *testing.T, m map[string]interface{}) map[string]interface{} {
+	t.Helper()
+	data, err := json.Marshal(m["prompt"])
+	if err != nil {
+		t.Fatalf("marshal prompt: %v", err)
+	}
+	var p map[string]interface{}
+	if err := json.Unmarshal(data, &p); err != nil {
+		t.Fatalf("unmarshal prompt: %v", err)
+	}
+	return p
+}
+
 func TestPromptsListRequiresAuth(t *testing.T) {
 	_, addr := setupServer(t)
 	resp := callRPC(t, addr, "test-secret-16chars", "prompts.list", map[string]string{
@@ -111,9 +124,7 @@ func TestPromptsUpdate(t *testing.T) {
 	}
 	m := resultMap(t, resp)
 	// Prompt struct không có json tags → field names viết hoa
-	data, _ := json.Marshal(m["prompt"])
-	var created map[string]interface{}
-	json.Unmarshal(data, &created)
+	created := promptFromResult(t, m)
 	promptID := created["ID"].(float64)
 
 	// Cập nhật prompt
@@ -127,9 +138,7 @@ func TestPromptsUpdate(t *testing.T) {
 		t.Fatalf("update error: %v", resp.Error)
 	}
 	m = resultMap(t, resp)
-	data, _ = json.Marshal(m["prompt"])
-	var updated map[string]interface{}
-	json.Unmarshal(data, &updated)
+	updated := promptFromResult(t, m)
 	if updated["Title"] != "Updated" {
 		t.Errorf("Title sau update = %q, want %q", updated["Title"], "Updated")
 	}
@@ -149,9 +158,7 @@ func TestPromptsDelete(t *testing.T) {
 		t.Fatalf("create error: %v", resp.Error)
 	}
 	m := resultMap(t, resp)
-	data, _ := json.Marshal(m["prompt"])
-	var created map[string]interface{}
-	json.Unmarshal(data, &created)
+	created := promptFromResult(t, m)
 	promptID := created["ID"].(float64)
 
 	// Xoá prompt
@@ -175,9 +182,14 @@ func TestPromptsDelete(t *testing.T) {
 		t.Fatalf("list error: %v", resp.Error)
 	}
 	m = resultMap(t, resp)
-	data, _ = json.Marshal(m["prompts"])
+	data, err := json.Marshal(m["prompts"])
+	if err != nil {
+		t.Fatalf("marshal prompts: %v", err)
+	}
 	var prompts []interface{}
-	json.Unmarshal(data, &prompts)
+	if err := json.Unmarshal(data, &prompts); err != nil {
+		t.Fatalf("unmarshal prompts: %v", err)
+	}
 	if len(prompts) != 0 {
 		t.Errorf("len(prompts) = %d, want 0 sau khi xoá", len(prompts))
 	}

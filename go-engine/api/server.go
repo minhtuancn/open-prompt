@@ -17,17 +17,19 @@ import (
 
 // Server là JSON-RPC server qua Unix socket / Named Pipe / TCP (test)
 type Server struct {
-	secret   string
-	db       *db.DB
-	router   *Router
-	listener net.Listener
+	secret      string
+	secretBytes []byte // precomputed để tránh alloc mỗi request
+	db          *db.DB
+	router      *Router
+	listener    net.Listener
 }
 
 // NewServer tạo server mới
 func NewServer(secret string, database *db.DB) (*Server, error) {
 	s := &Server{
-		secret: secret,
-		db:     database,
+		secret:      secret,
+		secretBytes: []byte(secret),
+		db:          database,
 	}
 	router, err := newRouter(s)
 	if err != nil {
@@ -129,7 +131,7 @@ func (s *Server) processMessage(conn net.Conn, data []byte) *Response {
 	}
 
 	// Validate secret — dùng constant-time compare để chống timing attack
-	if subtle.ConstantTimeCompare([]byte(envelope.Secret), []byte(s.secret)) != 1 {
+	if subtle.ConstantTimeCompare([]byte(envelope.Secret), s.secretBytes) != 1 {
 		return &Response{JSONRPC: "2.0", Error: copyErr(ErrUnauthorized), ID: envelope.Request.ID}
 	}
 
