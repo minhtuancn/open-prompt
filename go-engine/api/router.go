@@ -49,6 +49,12 @@ func newRouter(s *Server) (*Router, error) {
 	// Health checker — ping providers mỗi 5 phút
 	hc := provider.NewHealthChecker(providerReg, 0)
 	hc.Start()
+	// Token expiry watcher — kiểm tra tokens sắp hết hạn mỗi 2 phút
+	tew := provider.NewTokenExpiryWatcher(tokenRepo, func(tok repos.ProviderToken) {
+		// Log cảnh báo — Phase sau sẽ trigger re-detect hoặc refresh
+		_ = tok
+	}, 0)
+	tew.Start()
 	kc := provider.NewKeychain(provider.KeychainServiceName)
 	tokenManager := provider.NewTokenManager(kc, tokenRepo, registry)
 	// Derive JWT secret từ socket secret bằng HMAC-SHA256.
