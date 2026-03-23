@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
+	"github.com/minhtuancn/open-prompt/go-engine/db/repos"
 	"github.com/minhtuancn/open-prompt/go-engine/engine"
 	"github.com/minhtuancn/open-prompt/go-engine/model"
 	"github.com/minhtuancn/open-prompt/go-engine/model/providers"
@@ -59,6 +61,10 @@ func (r *Router) handleQueryStream(conn net.Conn, req *Request) (interface{}, *R
 		modelName = "claude-3-5-sonnet-20241022"
 	}
 
+	// Bắt đầu tính latency và thu thập chunks
+	start := time.Now()
+	var chunks []string
+
 	// Stream response qua JSON-RPC notifications
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
@@ -67,17 +73,29 @@ func (r *Router) handleQueryStream(conn net.Conn, req *Request) (interface{}, *R
 		Prompt: finalInput,
 		System: p.System,
 	}, func(chunk string) {
+		chunks = append(chunks, chunk)
 		_ = SendNotification(conn, "stream.chunk", map[string]interface{}{
 			"delta": chunk,
 			"done":  false,
 		})
 	})
 
+	latency := time.Since(start).Milliseconds()
+
 	if streamErr != nil {
 		_ = SendNotification(conn, "stream.chunk", map[string]interface{}{
 			"delta": "",
 			"done":  true,
 			"error": fmt.Sprintf("%v", streamErr),
+		})
+		// Ghi history với trạng thái error
+		_ = r.history.Insert(repos.InsertHistoryInput{
+			UserID:    claims.UserID,
+			Query:     finalInput,
+			Provider:  "anthropic",
+			Model:     modelName,
+			LatencyMs: latency,
+			Status:    "error",
 		})
 		return nil, nil // notification đã gửi
 	}
@@ -86,6 +104,17 @@ func (r *Router) handleQueryStream(conn net.Conn, req *Request) (interface{}, *R
 	_ = SendNotification(conn, "stream.chunk", map[string]interface{}{
 		"delta": "",
 		"done":  true,
+	})
+
+	// Ghi history với trạng thái success
+	_ = r.history.Insert(repos.InsertHistoryInput{
+		UserID:    claims.UserID,
+		Query:     finalInput,
+		Response:  strings.Join(chunks, ""),
+		Provider:  "anthropic",
+		Model:     modelName,
+		LatencyMs: latency,
+		Status:    "success",
 	})
 
 	return nil, nil // response delivered via notifications
