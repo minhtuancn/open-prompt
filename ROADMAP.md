@@ -37,12 +37,21 @@
 - [x] Keyboard shortcut customization
 - [x] Usage analytics daily aggregation (usage_daily table)
 
+### v1.0.0 — Public Release
+- [x] Release workflow (GitHub Actions auto-build + artifacts)
+- [x] Update manifest auto-generate
+- [x] Platform installers (NSIS, DMG, deb, AppImage)
+- [x] Documentation site (VitePress)
+- [x] Onboarding wizard (5 bước)
+- [x] Community prompts marketplace
+- [x] Telemetry opt-in
+
 ## Kế hoạch
 
-### v1.0.0 — Public Release
-- [ ] Public repo release workflow (GitHub Actions + artifacts)
-- [ ] Documentation site (Vitepress/Docusaurus)
-- [ ] Installer cho Windows/macOS/Linux (.msi, .dmg, .deb/.AppImage)
-- [ ] Community prompts marketplace
-- [ ] Onboarding wizard cho first-run
-- [ ] Telemetry opt-in + crash reporting
+### v1.1.0 — Community & Polish
+- [ ] Marketplace server (remote API thay vì local-only)
+- [ ] Prompt rating + reviews
+- [ ] Plugin marketplace
+- [ ] Auto-update Go Engine sidecar
+- [ ] Crash reporting (Sentry)
+- [ ] Keyboard shortcut recorder (tuỳ chỉnh tự do)

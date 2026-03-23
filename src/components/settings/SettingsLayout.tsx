@@ -10,8 +10,9 @@ import { PromptList } from '../prompts/PromptList'
 import { PromptEditor } from '../prompts/PromptEditor'
 import { HistoryPanel } from '../history/HistoryPanel'
 import { UpdateTab } from './UpdateTab'
+import { MarketplaceTab } from './MarketplaceTab'
 
-type Tab = 'providers' | 'prompts' | 'skills' | 'history' | 'hotkey' | 'appearance' | 'language' | 'analytics' | 'update'
+type Tab = 'providers' | 'prompts' | 'skills' | 'history' | 'marketplace' | 'hotkey' | 'appearance' | 'language' | 'analytics' | 'update'
 
 interface SkillData {
   id?: number
@@ -31,6 +32,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'prompts', label: 'Prompts' },
   { id: 'skills', label: 'Skills' },
   { id: 'history', label: 'Lịch sử' },
+  { id: 'marketplace', label: 'Marketplace' },
   { id: 'hotkey', label: 'Phím tắt' },
   { id: 'appearance', label: 'Giao diện' },
   { id: 'language', label: 'Ngôn ngữ' },
@@ -97,6 +99,7 @@ export function SettingsLayout({ onClose }: Props) {
           )
         )}
         {activeTab === 'history' && <HistoryPanel />}
+        {activeTab === 'marketplace' && <MarketplaceTab />}
         {activeTab === 'skills' && (
           skillView !== null ? (
             <SkillEditor

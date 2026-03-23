@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.0.0] - 2026-03-23
+
+### Public Release
+- **Release workflow** — GitHub Actions auto-build + artifact upload cho 4 platforms
+- **Update manifest** — auto-generate manifest khi publish release
+- **Code signing** — config cho Windows Authenticode + macOS notarization
+- **Platform installers** — NSIS (Windows), DMG (macOS), deb + AppImage (Linux)
+- **Documentation site** — VitePress với guide + API reference
+- **Onboarding wizard** — 5 bước: welcome → account → provider → hotkey → done
+- **Community marketplace** — browse, search, publish, install shared prompts
+- **Telemetry opt-in** — track events cơ bản khi user đồng ý
+- **Drag-drop model priority** — @dnd-kit sortable list trong ProvidersTab
+- **Rich text injection** — strip markdown trước khi inject vào app
+- **Settings 10 tabs** — thêm Marketplace tab
+
 ## [0.4.0] - 2026-03-23
 
 ### Advanced Features

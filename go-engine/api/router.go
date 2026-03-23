@@ -31,6 +31,7 @@ type Router struct {
 	conversations    *repos.ConversationRepo
 	healthChecker    *provider.HealthChecker
 	plugins          *repos.PluginRepo
+	marketplace      *repos.MarketplaceRepo
 }
 
 func newRouter(s *Server) (*Router, error) {
@@ -43,6 +44,7 @@ func newRouter(s *Server) (*Router, error) {
 	priorityRepo := repos.NewModelPriorityRepo(s.db)
 	conversations := repos.NewConversationRepo(s.db)
 	pluginRepo := repos.NewPluginRepo(s.db)
+	marketplaceRepo := repos.NewMarketplaceRepo(s.db)
 	registry := provider.DefaultRegistry()
 	// Provider routing registry — auto-register từ DB tokens + env vars
 	providerReg := providers.NewRegistry()
@@ -84,6 +86,7 @@ func newRouter(s *Server) (*Router, error) {
 		conversations:    conversations,
 		healthChecker:    hc,
 		plugins:          pluginRepo,
+		marketplace:      marketplaceRepo,
 	}, nil
 }
 
@@ -178,6 +181,18 @@ func (r *Router) dispatch(conn net.Conn, req *Request) (interface{}, *RPCError) 
 		return r.handleAnalyticsAggregate(req)
 	case "analytics.daily":
 		return r.handleAnalyticsDaily(req)
+	case "marketplace.list":
+		return r.handleMarketplaceList(req)
+	case "marketplace.search":
+		return r.handleMarketplaceSearch(req)
+	case "marketplace.publish":
+		return r.handleMarketplacePublish(req)
+	case "marketplace.install":
+		return r.handleMarketplaceInstall(req)
+	case "telemetry.opt_in":
+		return r.handleTelemetryOptIn(req)
+	case "telemetry.status":
+		return r.handleTelemetryStatus(req)
 	default:
 		return nil, &RPCError{Code: -32601, Message: fmt.Sprintf("method not found: %s", req.Method)}
 	}

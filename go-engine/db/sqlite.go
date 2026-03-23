@@ -23,6 +23,9 @@ var conversationsSQL string
 //go:embed migrations/005_plugins.sql
 var pluginsSQL string
 
+//go:embed migrations/006_marketplace.sql
+var marketplaceSQL string
+
 // DB wraps sql.DB
 type DB struct {
 	*sql.DB
@@ -76,6 +79,9 @@ func Migrate(db *DB) error {
 	}
 	if _, err := db.Exec(pluginsSQL); err != nil {
 		return fmt.Errorf("migration 005 failed: %w", err)
+	}
+	if _, err := db.Exec(marketplaceSQL); err != nil {
+		return fmt.Errorf("migration 006 failed: %w", err)
 	}
 	return nil
 }

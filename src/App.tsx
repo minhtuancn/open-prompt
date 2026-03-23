@@ -3,15 +3,14 @@ import { callEngine, streamQuery } from './hooks/useEngine'
 import { useAuthStore } from './store/authStore'
 import { useOverlayStore } from './store/overlayStore'
 import { useSettingsStore } from './store/settingsStore'
-import { CreateAccount } from './components/onboarding/CreateAccount'
+import { OnboardingWizard } from './components/onboarding/OnboardingWizard'
 import { LoginScreen } from './components/auth/LoginScreen'
 import { CommandInput } from './components/overlay/CommandInput'
 import { ResponsePanel } from './components/overlay/ResponsePanel'
-import { ApiKeySetup } from './components/settings/ApiKeySetup'
 import { SettingsLayout } from './components/settings/SettingsLayout'
 import './styles/globals.css'
 
-type AppState = 'loading' | 'first-run' | 'login' | 'api-setup' | 'overlay' | 'settings'
+type AppState = 'loading' | 'onboarding' | 'login' | 'overlay' | 'settings'
 
 const FONT_SIZE_CLASS: Record<string, string> = {
   sm: 'text-sm',
@@ -32,7 +31,7 @@ export default function App() {
       try {
         const result = await callEngine<{ is_first_run: boolean }>('auth.is_first_run', {})
         if (result.is_first_run) {
-          setState('first-run')
+          setState('onboarding')
         } else if (!token) {
           setState('login')
         } else {
@@ -95,16 +94,12 @@ export default function App() {
     )
   }
 
-  if (state === 'first-run') {
-    return <CreateAccount onDone={() => setState('api-setup')} />
+  if (state === 'onboarding') {
+    return <OnboardingWizard onComplete={() => setState('overlay')} />
   }
 
   if (state === 'login') {
     return <LoginScreen onDone={() => setState('overlay')} />
-  }
-
-  if (state === 'api-setup') {
-    return <ApiKeySetup onDone={() => setState('overlay')} />
   }
 
   if (state === 'settings') {

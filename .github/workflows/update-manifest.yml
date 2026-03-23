@@ -1,0 +1,55 @@
+name: Generate Update Manifest
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  manifest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download release assets info
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ github.event.release.tag_name }}"
+          CLEAN_VERSION="${VERSION#v}"
+
+          # Tạo update manifest dùng jq để escape JSON an toàn
+          NOTES=$(echo "${{ github.event.release.body }}" | jq -Rs .)
+
+          jq -n \
+            --arg version "$CLEAN_VERSION" \
+            --argjson notes "$NOTES" \
+            --arg pub_date "$(date -u +%FT%TZ)" \
+            --arg base_url "https://github.com/minhtuancn/open-prompt/releases/download/$VERSION" \
+            '{
+              version: $version,
+              notes: $notes,
+              pub_date: $pub_date,
+              platforms: {
+                "linux-x86_64": {
+                  url: "\($base_url)/open-prompt_\($version)_amd64.AppImage.tar.gz",
+                  signature: ""
+                },
+                "darwin-x86_64": {
+                  url: "\($base_url)/open-prompt_\($version)_x64.app.tar.gz",
+                  signature: ""
+                },
+                "darwin-aarch64": {
+                  url: "\($base_url)/open-prompt_\($version)_aarch64.app.tar.gz",
+                  signature: ""
+                },
+                "windows-x86_64": {
+                  url: "\($base_url)/open-prompt_\($version)_x64-setup.nsis.zip",
+                  signature: ""
+                }
+              }
+            }' > update-manifest.json
+
+      - name: Upload manifest to release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload ${{ github.event.release.tag_name }} update-manifest.json --clobber
