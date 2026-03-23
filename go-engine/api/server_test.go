@@ -88,3 +88,54 @@ func TestUnauthorizedRequest(t *testing.T) {
 		t.Errorf("expected unauthorized error, got %v", resp.Error)
 	}
 }
+
+func TestSecretEmptyStringRejected(t *testing.T) {
+	_, addr := setupServer(t)
+	resp := callRPC(t, addr, "", "auth.is_first_run", nil)
+	if resp.Error == nil || resp.Error.Code != -32001 {
+		t.Errorf("empty secret phải bị từ chối, got %v", resp.Error)
+	}
+}
+
+func TestRegisterPasswordTooLong(t *testing.T) {
+	_, addr := setupServer(t)
+	longPwd := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" // 73 chars
+	resp := callRPC(t, addr, "test-secret-16chars", "auth.register", map[string]string{
+		"username": "testuser",
+		"password": longPwd,
+	})
+	if resp.Error == nil {
+		t.Error("password > 72 bytes phải bị từ chối")
+	}
+}
+
+func TestLoginErrorIsGeneric(t *testing.T) {
+	_, addr := setupServer(t)
+	// Đăng ký user
+	callRPC(t, addr, "test-secret-16chars", "auth.register", map[string]string{
+		"username": "existinguser",
+		"password": "password123",
+	})
+
+	// Login với username không tồn tại
+	resp1 := callRPC(t, addr, "test-secret-16chars", "auth.login", map[string]string{
+		"username": "nonexistent",
+		"password": "anypassword",
+	})
+	// Login với sai password
+	resp2 := callRPC(t, addr, "test-secret-16chars", "auth.login", map[string]string{
+		"username": "existinguser",
+		"password": "wrongpassword",
+	})
+
+	// Cả 2 trường hợp phải trả về cùng error code và message để chống user enumeration
+	if resp1.Error == nil || resp2.Error == nil {
+		t.Fatal("cả 2 login fail phải có error")
+	}
+	if resp1.Error.Code != resp2.Error.Code {
+		t.Errorf("error code khác nhau: user-not-found=%d, wrong-password=%d", resp1.Error.Code, resp2.Error.Code)
+	}
+	if resp1.Error.Message != resp2.Error.Message {
+		t.Errorf("error message khác nhau: user-not-found=%q, wrong-password=%q", resp1.Error.Message, resp2.Error.Message)
+	}
+}

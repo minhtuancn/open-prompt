@@ -87,6 +87,43 @@ func TestLoginUnknownUser(t *testing.T) {
 	}
 }
 
+func TestRegisterPasswordValidation(t *testing.T) {
+	database := setupTestDB(t)
+	userRepo := repos.NewUserRepo(database)
+	svc, _ := auth.NewService(userRepo, "test-jwt-secret-16chars")
+
+	// Password quá ngắn
+	_, err := svc.Register("user1", "short")
+	if !errors.Is(err, auth.ErrPasswordTooShort) {
+		t.Errorf("expected ErrPasswordTooShort, got %v", err)
+	}
+
+	// Password quá dài (> 72 bytes — bcrypt truncation risk)
+	longPwd := string(make([]byte, 73))
+	for i := range longPwd {
+		longPwd = "a"
+		_ = i
+	}
+	longPwd = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" // 73 'a'
+	_, err = svc.Register("user2", longPwd)
+	if !errors.Is(err, auth.ErrPasswordTooLong) {
+		t.Errorf("expected ErrPasswordTooLong for 73-char password, got %v", err)
+	}
+}
+
+func TestRegisterUsernameValidation(t *testing.T) {
+	database := setupTestDB(t)
+	userRepo := repos.NewUserRepo(database)
+	svc, _ := auth.NewService(userRepo, "test-jwt-secret-16chars")
+
+	// Username quá dài (> 64 chars)
+	longName := "usernamethatisveryveryveryveryveryveryveryveryveryverylongindeed12345"
+	_, err := svc.Register(longName, "password123")
+	if !errors.Is(err, auth.ErrUsernameTooLong) {
+		t.Errorf("expected ErrUsernameTooLong, got %v", err)
+	}
+}
+
 func TestFirstRun(t *testing.T) {
 	database := setupTestDB(t)
 	userRepo := repos.NewUserRepo(database)

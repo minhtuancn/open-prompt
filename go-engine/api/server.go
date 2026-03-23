@@ -2,6 +2,7 @@ package api
 
 import (
 	"bufio"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -127,8 +128,8 @@ func (s *Server) processMessage(conn net.Conn, data []byte) *Response {
 		return &Response{JSONRPC: "2.0", Error: copyErr(ErrInvalidParams)}
 	}
 
-	// Validate secret
-	if envelope.Secret != s.secret {
+	// Validate secret — dùng constant-time compare để chống timing attack
+	if subtle.ConstantTimeCompare([]byte(envelope.Secret), []byte(s.secret)) != 1 {
 		return &Response{JSONRPC: "2.0", Error: copyErr(ErrUnauthorized), ID: envelope.Request.ID}
 	}
 

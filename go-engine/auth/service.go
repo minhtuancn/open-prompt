@@ -11,12 +11,21 @@ import (
 	"github.com/minhtuancn/open-prompt/go-engine/db/repos"
 )
 
+const (
+	minPasswordLen = 8
+	// bcrypt silently truncate ở 72 bytes → enforce ở layer application
+	maxPasswordLen = 72
+	maxUsernameLen = 64
+)
+
 var (
-	ErrUserExists          = errors.New("username already exists")
-	ErrUserNotFound        = errors.New("user not found")
-	ErrInvalidPassword     = errors.New("invalid password")
-	ErrPasswordTooShort    = errors.New("password must be at least 8 characters")
-	ErrInvalidCredentials  = errors.New("invalid username or password")
+	ErrUserExists         = errors.New("username already exists")
+	ErrUserNotFound       = errors.New("user not found")
+	ErrInvalidPassword    = errors.New("invalid password")
+	ErrPasswordTooShort   = errors.New("password must be at least 8 characters")
+	ErrPasswordTooLong    = errors.New("password must be at most 72 characters")
+	ErrUsernameTooLong    = errors.New("username must be at most 64 characters")
+	ErrInvalidCredentials = errors.New("invalid username or password")
 )
 
 // Service xử lý authentication logic
@@ -44,8 +53,14 @@ func (s *Service) IsFirstRun() (bool, error) {
 
 // Register tạo user mới với bcrypt password
 func (s *Service) Register(username, password string) (*repos.User, error) {
-	if len(password) < 8 {
+	if len(username) > maxUsernameLen {
+		return nil, ErrUsernameTooLong
+	}
+	if len(password) < minPasswordLen {
 		return nil, ErrPasswordTooShort
+	}
+	if len(password) > maxPasswordLen {
+		return nil, ErrPasswordTooLong
 	}
 
 	// Kiểm tra username đã tồn tại chưa
@@ -65,6 +80,10 @@ func (s *Service) Register(username, password string) (*repos.User, error) {
 	return s.users.Create(username, string(hash))
 }
 
+// dummyHash là hash của "" dùng để cân bằng thời gian khi user không tồn tại,
+// tránh user enumeration qua timing attack.
+var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("dummy"), config.DefaultBcryptCost)
+
 // Login xác thực user và trả về JWT token
 func (s *Service) Login(username, password string) (string, error) {
 	user, err := s.users.FindByUsername(username)
@@ -72,6 +91,8 @@ func (s *Service) Login(username, password string) (string, error) {
 		return "", fmt.Errorf("find user: %w", err)
 	}
 	if user == nil {
+		// Chạy dummy bcrypt để cân bằng thời gian — chống user enumeration
+		bcrypt.CompareHashAndPassword(dummyHash, []byte(password)) //nolint:errcheck
 		return "", ErrInvalidCredentials
 	}
 

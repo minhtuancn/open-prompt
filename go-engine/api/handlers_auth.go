@@ -3,6 +3,8 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/minhtuancn/open-prompt/go-engine/auth"
 )
 
 type registerParams struct {
@@ -22,7 +24,13 @@ func (r *Router) handleRegister(req *Request) (interface{}, *RPCError) {
 	}
 	user, err := r.auth.Register(p.Username, p.Password)
 	if err != nil {
-		return nil, &RPCError{Code: -32001, Message: err.Error()}
+		// Chỉ trả về các lỗi user-facing đã biết; che giấu lỗi internal
+		switch err {
+		case auth.ErrUserExists, auth.ErrPasswordTooShort, auth.ErrPasswordTooLong, auth.ErrUsernameTooLong:
+			return nil, &RPCError{Code: ErrUnauthorized.Code, Message: err.Error()}
+		default:
+			return nil, copyErr(ErrInternal)
+		}
 	}
 	return map[string]interface{}{
 		"id":       user.ID,
@@ -37,7 +45,8 @@ func (r *Router) handleLogin(req *Request) (interface{}, *RPCError) {
 	}
 	token, err := r.auth.Login(p.Username, p.Password)
 	if err != nil {
-		return nil, &RPCError{Code: -32001, Message: err.Error()}
+		// Chỉ trả về thông báo generic — không tiết lộ user có tồn tại hay không
+		return nil, &RPCError{Code: ErrUnauthorized.Code, Message: "invalid username or password"}
 	}
 	return map[string]string{"token": token}, nil
 }
