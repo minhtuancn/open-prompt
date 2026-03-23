@@ -30,6 +30,7 @@ type Router struct {
 	providerRegistry *providers.Registry
 	conversations    *repos.ConversationRepo
 	healthChecker    *provider.HealthChecker
+	plugins          *repos.PluginRepo
 }
 
 func newRouter(s *Server) (*Router, error) {
@@ -41,6 +42,7 @@ func newRouter(s *Server) (*Router, error) {
 	tokenRepo := repos.NewProviderTokenRepo(s.db)
 	priorityRepo := repos.NewModelPriorityRepo(s.db)
 	conversations := repos.NewConversationRepo(s.db)
+	pluginRepo := repos.NewPluginRepo(s.db)
 	registry := provider.DefaultRegistry()
 	// Provider routing registry — auto-register từ DB tokens + env vars
 	providerReg := providers.NewRegistry()
@@ -81,6 +83,7 @@ func newRouter(s *Server) (*Router, error) {
 		providerRegistry: providerReg,
 		conversations:    conversations,
 		healthChecker:    hc,
+		plugins:          pluginRepo,
 	}, nil
 }
 
@@ -159,6 +162,14 @@ func (r *Router) dispatch(conn net.Conn, req *Request) (interface{}, *RPCError) 
 		return r.handleConversationsDelete(req)
 	case "health.check":
 		return r.handleHealthCheck(req)
+	case "plugins.list":
+		return r.handlePluginsList(req)
+	case "plugins.install":
+		return r.handlePluginsInstall(req)
+	case "plugins.toggle":
+		return r.handlePluginsToggle(req)
+	case "plugins.uninstall":
+		return r.handlePluginsUninstall(req)
 	default:
 		return nil, &RPCError{Code: -32601, Message: fmt.Sprintf("method not found: %s", req.Method)}
 	}

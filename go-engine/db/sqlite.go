@@ -20,6 +20,9 @@ var multiProviderSQL string
 //go:embed migrations/004_conversations.sql
 var conversationsSQL string
 
+//go:embed migrations/005_plugins.sql
+var pluginsSQL string
+
 // DB wraps sql.DB
 type DB struct {
 	*sql.DB
@@ -70,6 +73,9 @@ func Migrate(db *DB) error {
 	}
 	if _, err := db.Exec(conversationsSQL); err != nil {
 		return fmt.Errorf("migration 004 failed: %w", err)
+	}
+	if _, err := db.Exec(pluginsSQL); err != nil {
+		return fmt.Errorf("migration 005 failed: %w", err)
 	}
 	return nil
 }
