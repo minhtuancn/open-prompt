@@ -92,6 +92,7 @@ func (r *Router) handleQueryStream(conn net.Conn, req *Request) (interface{}, *R
 		_ = r.history.Insert(repos.InsertHistoryInput{
 			UserID:    claims.UserID,
 			Query:     finalInput,
+			// TODO: lấy provider thực từ model router khi hỗ trợ multi-provider
 			Provider:  "anthropic",
 			Model:     modelName,
 			LatencyMs: latency,
@@ -111,6 +112,7 @@ func (r *Router) handleQueryStream(conn net.Conn, req *Request) (interface{}, *R
 		UserID:    claims.UserID,
 		Query:     finalInput,
 		Response:  strings.Join(chunks, ""),
+		// TODO: lấy provider thực từ model router khi hỗ trợ multi-provider
 		Provider:  "anthropic",
 		Model:     modelName,
 		LatencyMs: latency,

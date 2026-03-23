@@ -34,11 +34,13 @@ func (r *HistoryRepo) Insert(input InsertHistoryInput) error {
 	if status == "" {
 		status = "success"
 	}
+	// Định dạng timestamp theo chuẩn SQLite để date() và datetime() nhận diện đúng
+	now := time.Now().UTC().Format("2006-01-02 15:04:05")
 	_, err := r.db.Exec(
 		`INSERT INTO history (user_id, query, response, provider, model, latency_ms, status, timestamp)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		input.UserID, input.Query, input.Response, input.Provider, input.Model,
-		input.LatencyMs, status, time.Now().UTC(),
+		input.LatencyMs, status, now,
 	)
 	if err != nil {
 		return fmt.Errorf("insert history: %w", err)

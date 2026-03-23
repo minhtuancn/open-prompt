@@ -25,7 +25,6 @@ func (r *Router) handleAnalyticsSummary(req *Request) (interface{}, *RPCError) {
 		return nil, rpcErr
 	}
 	var p struct {
-		Token  string `json:"token"`
 		Period string `json:"period"`
 	}
 	if err := decodeParams(req.Params, &p); err != nil {
@@ -52,7 +51,6 @@ func (r *Router) handleAnalyticsByProvider(req *Request) (interface{}, *RPCError
 		return nil, rpcErr
 	}
 	var p struct {
-		Token  string `json:"token"`
 		Period string `json:"period"`
 	}
 	if err := decodeParams(req.Params, &p); err != nil {
