@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.4.0] - 2026-03-23
+
+### Advanced Features
+- **Plugin system** — install, list, toggle, uninstall (provider/skill/formatter types)
+- **Prompt export/import** — JSON format, bulk import
+- **Markdown renderer** — code blocks, bold, italic, headings, lists
+- **Hotkey customization** — 6 preset options, lưu vào settings
+- **Analytics daily aggregation** — rollup history → usage_daily
+
+## [0.3.0] - 2026-03-23
+
+### Production Polish
+- **OAuth WebView** — start_oauth (WebView/DeviceFlow/browser), poll_oauth
+- **DeviceFlowDialog** — UI cho GitHub Device Flow polling
+- **Tauri auto-updater** — check/download/install updates, UpdateTab
+- **Multi-turn streaming** — conversation_id trong query.stream
+- **Token Expiry Watcher** — kiểm tra tokens mỗi 2 phút
+
 ## [0.2.0] - 2026-03-23
 
 ### Phase 2A: Multi-Provider Engine
