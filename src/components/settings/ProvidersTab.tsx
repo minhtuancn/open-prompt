@@ -90,9 +90,10 @@ export function ProvidersTab() {
       <div className="mt-4 pt-4 border-t border-white/10">
         <GatewayForm onAdded={() => {
           if (!token) return
+          setError('')
           callEngine<Provider[]>('providers.list', { token })
             .then((list) => setProviders(list ?? []))
-            .catch(console.error)
+            .catch((e) => { console.error(e); setError('Không thể tải dữ liệu') })
         }} />
       </div>
     </div>

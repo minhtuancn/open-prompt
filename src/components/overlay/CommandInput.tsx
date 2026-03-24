@@ -21,16 +21,18 @@ export function CommandInput({ onSubmit }: Props) {
   const [showModelPicker, setShowModelPicker] = useState(false)
   const [mentionQuery, setMentionQuery] = useState('')
   const [showMentionHint, setShowMentionHint] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     if (!token) return
+    setError(null)
     window.__rpc?.call('commands.list', { token })
       .then((res: unknown) => {
         const data = res as { commands: SlashCommand[] }
         setCommands(data.commands || [])
       })
-      .catch(console.error)
+      .catch((e: unknown) => { console.error(e); setError('Không thể tải dữ liệu') })
   }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -162,6 +164,8 @@ export function CommandInput({ onSubmit }: Props) {
           ))}
         </div>
       )}
+
+      {error && <p className="text-red-400 text-sm px-3 py-2">{error}</p>}
 
       <div className="relative">
         <MentionHint query={mentionQuery} onSelect={handleMentionSelect} visible={showMentionHint} />

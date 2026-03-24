@@ -97,6 +97,7 @@ export function ModelPriorityList() {
   const token = useAuthStore((s) => s.token)
   const [items, setItems] = useState<PriorityItem[]>([])
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -106,6 +107,7 @@ export function ModelPriorityList() {
   // Load priority list từ providers.list
   useEffect(() => {
     if (!token) return
+    setError(null)
     callEngine<{ id: string; name: string; connected: boolean }[]>('providers.list', { token })
       .then((providers) => {
         if (!providers) return
@@ -120,7 +122,7 @@ export function ModelPriorityList() {
           }))
         )
       })
-      .catch(console.error)
+      .catch((e) => { console.error(e); setError('Không thể tải dữ liệu') })
   }, [token])
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -179,14 +181,18 @@ export function ModelPriorityList() {
 
   if (items.length === 0) {
     return (
-      <p className="text-xs text-white/30">
-        Chưa có provider nào được kết nối. Thêm API key ở trên.
-      </p>
+      <>
+        {error && <p className="text-red-400 text-sm px-3 py-2">{error}</p>}
+        <p className="text-xs text-white/30">
+          Chưa có provider nào được kết nối. Thêm API key ở trên.
+        </p>
+      </>
     )
   }
 
   return (
     <div className="flex flex-col gap-1.5">
+      {error && <p className="text-red-400 text-sm px-3 py-2">{error}</p>}
       <div className="flex items-center justify-between mb-1">
         <span className="text-xs text-white/40">Kéo thả để sắp xếp thứ tự ưu tiên</span>
         {saving && <span className="text-xs text-indigo-400 animate-pulse">Đang lưu...</span>}
