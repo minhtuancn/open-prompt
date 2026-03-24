@@ -12,6 +12,7 @@ interface ProviderState {
   loading: boolean
   error: string | null
   lastFetchToken: string | null
+  hasFetched: boolean
   fetch: (token: string) => Promise<void>
 }
 
@@ -20,13 +21,13 @@ export const useProviderStore = create<ProviderState>()((set, get) => ({
   loading: false,
   error: null,
   lastFetchToken: null,
+  hasFetched: false,
   fetch: async (token: string) => {
-    // Chỉ fetch lại nếu token thay đổi hoặc chưa fetch
-    if (get().lastFetchToken === token && get().providers.length > 0) return
+    if (get().hasFetched && get().lastFetchToken === token) return
     set({ loading: true, error: null })
     try {
       const list = await callEngine<ProviderInfo[]>('providers.list', { token })
-      set({ providers: list ?? [], loading: false, lastFetchToken: token })
+      set({ providers: list ?? [], loading: false, lastFetchToken: token, hasFetched: true })
     } catch (e) {
       console.error(e)
       set({ error: 'Không thể tải danh sách provider', loading: false })

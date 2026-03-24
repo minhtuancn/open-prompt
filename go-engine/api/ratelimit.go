@@ -36,7 +36,6 @@ func NewRateLimiter() *RateLimiter {
 		},
 		stopCh: make(chan struct{}),
 	}
-	// Cleanup expired buckets mỗi 5 phút để tránh memory leak
 	go func() {
 		ticker := time.NewTicker(5 * time.Minute)
 		defer ticker.Stop()
@@ -83,7 +82,6 @@ func (rl *RateLimiter) Allow(method, caller string) bool {
 	return true
 }
 
-// cleanup xoá expired entries khỏi buckets map
 func (rl *RateLimiter) cleanup() {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()

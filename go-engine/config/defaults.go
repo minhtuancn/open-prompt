@@ -34,11 +34,8 @@ func SocketPath() string {
 	return "/tmp/open-prompt.sock"
 }
 
-// DBFileName trả về tên file database.
-// Có thể override qua OP_DB_PATH (full path) hoặc dùng default "open-prompt.db"
-func DBFileName() string {
-	return "open-prompt.db"
-}
+// DBFileName là tên mặc định của file database SQLite
+const DBFileName = "open-prompt.db"
 
 // DBPath trả về full path tới database file nếu override qua OP_DB_PATH
 func DBPath() string {

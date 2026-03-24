@@ -1,33 +1,27 @@
 package api
 
-import "encoding/json"
-
 // Giới hạn kích thước input
 const (
-	MaxTitleLen    = 200
-	MaxContentLen  = 50000
-	MaxTagsLen     = 500
-	MaxNameLen     = 32
-	MaxLimit       = 1000
-	MaxTemplateLen = 100000 // 100KB max template size
+	MaxTitleLen   = 200
+	MaxContentLen = 50000
+	MaxTagsLen    = 500
+	MaxNameLen    = 32
+	MaxLimit      = 1000
 )
 
-// extractToken lấy token từ request params (dùng cho rate limiting)
+// extractToken lấy token từ request params (dùng cho rate limiting).
+// Params đã được decode thành map[string]interface{} bởi json.Unmarshal nên
+// dùng type assertion thay vì marshal/unmarshal lại.
 func extractToken(req *Request) string {
 	if req == nil || req.Params == nil {
 		return ""
 	}
-	raw, err := json.Marshal(req.Params)
-	if err != nil {
+	m, ok := req.Params.(map[string]interface{})
+	if !ok {
 		return ""
 	}
-	var p struct {
-		Token string `json:"token"`
-	}
-	if err := json.Unmarshal(raw, &p); err != nil {
-		return ""
-	}
-	return p.Token
+	tok, _ := m["token"].(string)
+	return tok
 }
 
 // clampLimit giới hạn limit trong khoảng hợp lệ

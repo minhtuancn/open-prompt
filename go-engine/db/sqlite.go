@@ -40,7 +40,7 @@ func Open() (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	return openPath(filepath.Join(dir, config.DBFileName()))
+	return openPath(filepath.Join(dir, config.DBFileName))
 }
 
 // OpenInMemory mở SQLite in-memory (dùng cho test)

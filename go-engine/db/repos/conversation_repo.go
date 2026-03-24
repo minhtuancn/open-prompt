@@ -81,8 +81,8 @@ func (r *ConversationRepo) List(userID int64, limit int) ([]Conversation, error)
 	return result, rows.Err()
 }
 
-// AddMessage thêm message vào conversation (có kiểm tra ownership)
-func (r *ConversationRepo) AddMessage(convID, userID int64, role, content, provider, model string, latencyMs int64) error {
+// verifyOwner kiểm tra conversation thuộc về user. Trả về error nếu không tìm thấy hoặc không phải owner.
+func (r *ConversationRepo) verifyOwner(convID, userID int64) error {
 	var ownerID int64
 	err := r.db.QueryRow(`SELECT user_id FROM conversations WHERE id = ?`, convID).Scan(&ownerID)
 	if err != nil {
@@ -91,9 +91,17 @@ func (r *ConversationRepo) AddMessage(convID, userID int64, role, content, provi
 	if ownerID != userID {
 		return fmt.Errorf("forbidden: conversation does not belong to user")
 	}
+	return nil
+}
+
+// AddMessage thêm message vào conversation (có kiểm tra ownership)
+func (r *ConversationRepo) AddMessage(convID, userID int64, role, content, provider, model string, latencyMs int64) error {
+	if err := r.verifyOwner(convID, userID); err != nil {
+		return err
+	}
 
 	now := time.Now().UTC().Format("2006-01-02 15:04:05")
-	_, err = r.db.Exec(
+	_, err := r.db.Exec(
 		`INSERT INTO messages (conversation_id, role, content, provider, model, latency_ms, created_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		convID, role, content, provider, model, latencyMs, now,
@@ -108,13 +116,8 @@ func (r *ConversationRepo) AddMessage(convID, userID int64, role, content, provi
 
 // GetMessages trả về tất cả messages của conversation (có kiểm tra ownership)
 func (r *ConversationRepo) GetMessages(convID, userID int64) ([]Message, error) {
-	var ownerID int64
-	err := r.db.QueryRow(`SELECT user_id FROM conversations WHERE id = ?`, convID).Scan(&ownerID)
-	if err != nil {
-		return nil, fmt.Errorf("conversation not found: %w", err)
-	}
-	if ownerID != userID {
-		return nil, fmt.Errorf("forbidden: conversation does not belong to user")
+	if err := r.verifyOwner(convID, userID); err != nil {
+		return nil, err
 	}
 
 	rows, err := r.db.Query(
