@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 
+/** OAuth device flow polling interval in ms */
+const OAUTH_POLL_INTERVAL = 5000
+
 interface Props {
   provider: string
   userCode: string
@@ -42,7 +45,7 @@ export function DeviceFlowDialog({ provider, userCode, verificationUri, deviceCo
       } catch (e) {
         console.error('poll error:', e)
       }
-    }, 5000)
+    }, OAUTH_POLL_INTERVAL)
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)

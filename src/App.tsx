@@ -21,8 +21,15 @@ const FONT_SIZE_CLASS: Record<string, string> = {
 export default function App() {
   const [state, setState] = useState<AppState>('loading')
   const { token } = useAuthStore()
-  const { reset, appendChunk, setStreaming, setError, setFallbackProviders, setLastQuery } = useOverlayStore()
-  const activeProvider = useOverlayStore((s) => s.activeProvider)
+  const { reset, appendChunk, setStreaming, setError, setFallbackProviders, setLastQuery, activeProvider } = useOverlayStore((s) => ({
+    reset: s.reset,
+    appendChunk: s.appendChunk,
+    setStreaming: s.setStreaming,
+    setError: s.setError,
+    setFallbackProviders: s.setFallbackProviders,
+    setLastQuery: s.setLastQuery,
+    activeProvider: s.activeProvider,
+  }))
   const fontSize = useSettingsStore((s) => s.fontSize)
   const fontSizeClass = FONT_SIZE_CLASS[fontSize]
 

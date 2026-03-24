@@ -6,6 +6,9 @@ import { SlashMenu, type SlashCommand } from './SlashMenu'
 import { ModelPicker } from './ModelPicker'
 import { MentionHint } from './MentionHint'
 
+/** Module-level regex for @mention detection — avoids recompilation on every keystroke */
+const MENTION_REGEX = /@(\w*)$/
+
 interface Props {
   onSubmit: (input: string, slashName?: string, extraVars?: Record<string, string>) => void
 }
@@ -50,7 +53,7 @@ export function CommandInput({ onSubmit }: Props) {
     }
 
     // Detect @mention
-    const atMatch = value.match(/@(\w*)$/)
+    const atMatch = value.match(MENTION_REGEX)
     if (atMatch) {
       setMentionQuery(atMatch[1])
       setShowMentionHint(true)
