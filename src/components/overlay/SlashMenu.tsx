@@ -74,11 +74,14 @@ export function SlashMenu({ commands, query, onSelect, onClose, visible }: Props
     <div
       className="absolute bottom-full left-0 right-0 mb-1 bg-black/80 backdrop-blur-md border border-white/10 rounded-xl overflow-hidden shadow-2xl z-50 max-h-64 overflow-y-auto"
       ref={listRef}
+      role="listbox"
+      aria-label="Danh sách lệnh"
     >
       {filtered.map((cmd, index) => (
         <button
           key={cmd.id}
           data-index={index}
+          role="option"
           className={`w-full text-left px-4 py-2.5 flex items-center gap-3 transition-colors ${
             index === activeIndex
               ? 'bg-indigo-500/30 text-white'

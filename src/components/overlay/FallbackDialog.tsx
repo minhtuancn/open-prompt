@@ -15,6 +15,7 @@ export function FallbackDialog({ errorMessage, providers, onRetry, onCancel }: P
           <button
             key={name}
             onClick={() => onRetry(name)}
+            aria-label={"Thử lại với " + name}
             className="px-3 py-1 bg-white/10 hover:bg-indigo-500/30 text-white/80 hover:text-white text-xs rounded-md border border-white/10 hover:border-indigo-500/30 transition-colors"
           >
             {name}
@@ -22,6 +23,7 @@ export function FallbackDialog({ errorMessage, providers, onRetry, onCancel }: P
         ))}
         <button
           onClick={onCancel}
+          aria-label="Huỷ"
           className="px-3 py-1 text-white/30 hover:text-white/60 text-xs transition-colors"
         >
           Hủy

@@ -68,6 +68,9 @@ func (r *Router) handleSkillsCreate(req *Request) (interface{}, *RPCError) {
 	if err := decodeParams(req.Params, &p); err != nil || p.Name == "" {
 		return nil, copyErr(ErrInvalidParams)
 	}
+	p.Name = truncateString(p.Name, MaxNameLen)
+	p.PromptText = truncateString(p.PromptText, MaxContentLen)
+	p.Tags = truncateString(p.Tags, MaxTagsLen)
 	skill, err := r.skills.Create(repos.CreateSkillInput{
 		UserID: claims.UserID, Name: p.Name, PromptText: p.PromptText,
 		Model: p.Model, Provider: p.Provider, Tags: p.Tags,

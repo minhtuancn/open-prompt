@@ -21,13 +21,15 @@ export function SkillList({ onEdit, onNew, refreshSignal }: Props) {
   const token = useAuthStore((s) => s.token)
   const [skills, setSkills] = useState<Skill[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!token) return
     setLoading(true)
+    setError(null)
     callEngine<{ skills: Skill[] }>('skills.list', { token })
       .then((res) => setSkills(res.skills ?? []))
-      .catch(console.error)
+      .catch((e) => { console.error(e); setError('Không thể tải dữ liệu') })
       .finally(() => setLoading(false))
   }, [refreshSignal, token])
 
@@ -43,6 +45,10 @@ export function SkillList({ onEdit, onNew, refreshSignal }: Props) {
 
   if (loading) {
     return <div className="text-white/40 text-sm text-center py-8">Đang tải...</div>
+  }
+
+  if (error) {
+    return <p className="text-red-400 text-sm px-3 py-2">{error}</p>
   }
 
   return (

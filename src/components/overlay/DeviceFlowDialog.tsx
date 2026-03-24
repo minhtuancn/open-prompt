@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 
+/** OAuth device flow polling interval in ms */
+const OAUTH_POLL_INTERVAL = 5000
+
 interface Props {
   provider: string
   userCode: string
@@ -14,6 +17,11 @@ export function DeviceFlowDialog({ provider, userCode, verificationUri, deviceCo
   const [status, setStatus] = useState<'waiting' | 'success' | 'error'>('waiting')
   const [error, setError] = useState('')
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const isMountedRef = useRef(true)
+
+  useEffect(() => {
+    return () => { isMountedRef.current = false }
+  }, [])
 
   useEffect(() => {
     // Poll mỗi 5 giây
@@ -23,6 +31,7 @@ export function DeviceFlowDialog({ provider, userCode, verificationUri, deviceCo
           provider,
           deviceCode,
         })
+        if (!isMountedRef.current) return
         if (result.done) {
           if (result.error) {
             setStatus('error')
@@ -36,7 +45,7 @@ export function DeviceFlowDialog({ provider, userCode, verificationUri, deviceCo
       } catch (e) {
         console.error('poll error:', e)
       }
-    }, 5000)
+    }, OAUTH_POLL_INTERVAL)
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { callEngine } from '../../hooks/useEngine'
 import { useAuthStore } from '../../store/authStore'
 import { GatewayForm } from './GatewayForm'
+import { ModelPriorityList } from './ModelPriorityList'
 
 interface Provider {
   id: string
@@ -80,12 +81,19 @@ export function ProvidersTab() {
         </div>
       ))}
 
+      {/* Model Priority — drag-drop */}
+      <div className="mt-4 pt-4 border-t border-white/10">
+        <div className="text-sm font-medium text-white mb-3">Model Priority</div>
+        <ModelPriorityList />
+      </div>
+
       <div className="mt-4 pt-4 border-t border-white/10">
         <GatewayForm onAdded={() => {
           if (!token) return
+          setError('')
           callEngine<Provider[]>('providers.list', { token })
             .then((list) => setProviders(list ?? []))
-            .catch(console.error)
+            .catch((e) => { console.error(e); setError('Không thể tải dữ liệu') })
         }} />
       </div>
     </div>

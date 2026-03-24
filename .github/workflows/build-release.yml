@@ -61,17 +61,29 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Build Go Engine sidecar
+        run: |
+          cd go-engine
+          go build -o ../src-tauri/binaries/go-engine-${{ matrix.target }}${{ matrix.platform == 'windows-latest' && '.exe' || '' }} .
+
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           tagName: ${{ github.ref_name || github.event.inputs.version }}
           releaseName: "Open Prompt ${{ github.ref_name || github.event.inputs.version }}"
-          releaseBody: "Xem [CHANGELOG.md](https://github.com/minhtuancn/open-prompt-release/blob/main/CHANGELOG.md) để biết các thay đổi."
+          releaseBody: "Xem [CHANGELOG.md](https://github.com/minhtuancn/open-prompt/blob/main/CHANGELOG.md) để biết các thay đổi."
           releaseDraft: true
           prerelease: false
           args: --target ${{ matrix.target }}
+          updaterJsonKeepUniversal: true
 
   publish-to-release-repo:
     needs: build

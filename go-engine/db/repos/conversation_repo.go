@@ -57,6 +57,8 @@ func (r *ConversationRepo) Create(userID int64, title string) (int64, error) {
 func (r *ConversationRepo) List(userID int64, limit int) ([]Conversation, error) {
 	if limit <= 0 {
 		limit = 20
+	} else if limit > 1000 {
+		limit = 1000
 	}
 	rows, err := r.db.Query(
 		`SELECT id, user_id, title, COALESCE(provider,''), COALESCE(model,''), created_at, updated_at
@@ -79,10 +81,19 @@ func (r *ConversationRepo) List(userID int64, limit int) ([]Conversation, error)
 	return result, rows.Err()
 }
 
-// AddMessage thêm message vào conversation
-func (r *ConversationRepo) AddMessage(convID int64, role, content, provider, model string, latencyMs int64) error {
+// AddMessage thêm message vào conversation (có kiểm tra ownership)
+func (r *ConversationRepo) AddMessage(convID, userID int64, role, content, provider, model string, latencyMs int64) error {
+	var ownerID int64
+	err := r.db.QueryRow(`SELECT user_id FROM conversations WHERE id = ?`, convID).Scan(&ownerID)
+	if err != nil {
+		return fmt.Errorf("conversation not found: %w", err)
+	}
+	if ownerID != userID {
+		return fmt.Errorf("forbidden: conversation does not belong to user")
+	}
+
 	now := time.Now().UTC().Format("2006-01-02 15:04:05")
-	_, err := r.db.Exec(
+	_, err = r.db.Exec(
 		`INSERT INTO messages (conversation_id, role, content, provider, model, latency_ms, created_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		convID, role, content, provider, model, latencyMs, now,
@@ -95,8 +106,17 @@ func (r *ConversationRepo) AddMessage(convID int64, role, content, provider, mod
 	return nil
 }
 
-// GetMessages trả về tất cả messages của conversation
-func (r *ConversationRepo) GetMessages(convID int64) ([]Message, error) {
+// GetMessages trả về tất cả messages của conversation (có kiểm tra ownership)
+func (r *ConversationRepo) GetMessages(convID, userID int64) ([]Message, error) {
+	var ownerID int64
+	err := r.db.QueryRow(`SELECT user_id FROM conversations WHERE id = ?`, convID).Scan(&ownerID)
+	if err != nil {
+		return nil, fmt.Errorf("conversation not found: %w", err)
+	}
+	if ownerID != userID {
+		return nil, fmt.Errorf("forbidden: conversation does not belong to user")
+	}
+
 	rows, err := r.db.Query(
 		`SELECT id, conversation_id, role, content, COALESCE(provider,''), COALESCE(model,''),
 		        COALESCE(latency_ms,0), created_at

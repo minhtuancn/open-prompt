@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log"
 	"regexp"
 
 	"github.com/minhtuancn/open-prompt/go-engine/db/repos"
@@ -52,6 +53,8 @@ func (r *Router) handlePromptsCreate(req *Request) (interface{}, *RPCError) {
 	if p.Title == "" || p.Content == "" {
 		return nil, &RPCError{Code: -32602, Message: "title và content không được rỗng"}
 	}
+	p.Title = truncateString(p.Title, MaxTitleLen)
+	p.Content = truncateString(p.Content, MaxContentLen)
 	if p.IsSlash && !slashNameRegex.MatchString(p.SlashName) {
 		return nil, &RPCError{Code: -32602, Message: "slash_name không hợp lệ: chỉ a-z 0-9 - _ và tối đa 32 ký tự"}
 	}
@@ -86,17 +89,32 @@ func (r *Router) handlePromptsUpdate(req *Request) (interface{}, *RPCError) {
 	if err := decodeParams(req.Params, &p); err != nil {
 		return nil, copyErr(ErrInvalidParams)
 	}
-	if _, err := r.auth.ValidateToken(p.Token); err != nil {
+	claims, err := r.auth.ValidateToken(p.Token)
+	if err != nil {
 		return nil, copyErr(ErrUnauthorized)
 	}
 	if p.ID == 0 || p.Title == "" || p.Content == "" {
 		return nil, copyErr(ErrInvalidParams)
 	}
+	p.Title = truncateString(p.Title, MaxTitleLen)
+	p.Content = truncateString(p.Content, MaxContentLen)
 	if p.IsSlash && !slashNameRegex.MatchString(p.SlashName) {
 		return nil, &RPCError{Code: -32602, Message: "slash_name không hợp lệ"}
 	}
 
-	// Update trả về error, sau đó lấy prompt mới nhất bằng FindByID
+	// Kiểm tra ownership — chống IDOR
+	existing, err := r.prompts.FindByID(p.ID)
+	if err != nil {
+		log.Printf("ERROR find prompt %d: %v", p.ID, err)
+		return nil, copyErr(ErrInternal)
+	}
+	if existing == nil {
+		return nil, &RPCError{Code: -32602, Message: "prompt không tồn tại"}
+	}
+	if existing.UserID != claims.UserID {
+		return nil, &RPCError{Code: -32001, Message: "không có quyền truy cập prompt này"}
+	}
+
 	if err := r.prompts.Update(p.ID, repos.UpdatePromptInput{
 		Title:     p.Title,
 		Content:   p.Content,
@@ -107,11 +125,12 @@ func (r *Router) handlePromptsUpdate(req *Request) (interface{}, *RPCError) {
 	}); err != nil {
 		return nil, copyErr(ErrInternal)
 	}
-	prompt, err := r.prompts.FindByID(p.ID)
-	if err != nil || prompt == nil {
-		return nil, copyErr(ErrInternal)
-	}
-	return map[string]interface{}{"prompt": prompt}, nil
+	// Reuse existing record + merge updated fields (tránh FindByID thêm lần nữa)
+	existing.Title = p.Title
+	existing.Content = p.Content
+	existing.Category = p.Category
+	existing.Tags = p.Tags
+	return map[string]interface{}{"prompt": existing}, nil
 }
 
 // handlePromptsDelete xoá prompt
@@ -123,12 +142,27 @@ func (r *Router) handlePromptsDelete(req *Request) (interface{}, *RPCError) {
 	if err := decodeParams(req.Params, &p); err != nil {
 		return nil, copyErr(ErrInvalidParams)
 	}
-	if _, err := r.auth.ValidateToken(p.Token); err != nil {
+	claims, err := r.auth.ValidateToken(p.Token)
+	if err != nil {
 		return nil, copyErr(ErrUnauthorized)
 	}
 	if p.ID == 0 {
 		return nil, copyErr(ErrInvalidParams)
 	}
+
+	// Kiểm tra ownership — chống IDOR
+	existing, err := r.prompts.FindByID(p.ID)
+	if err != nil {
+		log.Printf("ERROR find prompt %d for delete: %v", p.ID, err)
+		return nil, copyErr(ErrInternal)
+	}
+	if existing == nil {
+		return nil, &RPCError{Code: -32602, Message: "prompt không tồn tại"}
+	}
+	if existing.UserID != claims.UserID {
+		return nil, &RPCError{Code: -32001, Message: "không có quyền xóa prompt này"}
+	}
+
 	if err := r.prompts.Delete(p.ID); err != nil {
 		return nil, copyErr(ErrInternal)
 	}

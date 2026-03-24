@@ -4,6 +4,11 @@ import { useOverlayStore } from '../../store/overlayStore'
 import { FallbackDialog } from './FallbackDialog'
 import { MarkdownRenderer } from './MarkdownRenderer'
 
+/** Delay before resetting the "Copied" indicator */
+const COPY_RESET_DELAY = 2000
+/** Delay before resetting the "Injected" indicator */
+const INJECT_RESET_DELAY = 3000
+
 export function ResponsePanel() {
   const { chunks, isStreaming, error, fallbackProviders, setFallbackProviders } = useOverlayStore()
   const text = chunks.join('')
@@ -14,10 +19,12 @@ export function ResponsePanel() {
   const [injectedApp, setInjectedApp] = useState('')
   const [copied, setCopied] = useState(false)
   const injectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     return () => {
       if (injectTimerRef.current) clearTimeout(injectTimerRef.current)
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
     }
   }, [])
 
@@ -32,7 +39,7 @@ export function ResponsePanel() {
       const appName = await invoke<string>('inject_text', { text })
       setInjected(true)
       setInjectedApp(appName || '')
-      injectTimerRef.current = setTimeout(() => { setInjected(false); setInjectedApp('') }, 3000)
+      injectTimerRef.current = setTimeout(() => { setInjected(false); setInjectedApp('') }, INJECT_RESET_DELAY)
     } catch (err) {
       setInjectError(err as string)
     } finally {
@@ -44,7 +51,8 @@ export function ResponsePanel() {
     try {
       await navigator.clipboard.writeText(text)
       setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
+      copyTimerRef.current = setTimeout(() => setCopied(false), COPY_RESET_DELAY)
     } catch {
       // Fallback cho khi clipboard API không available
       const textarea = document.createElement('textarea')
@@ -54,7 +62,8 @@ export function ResponsePanel() {
       document.execCommand('copy')
       document.body.removeChild(textarea)
       setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
+      copyTimerRef.current = setTimeout(() => setCopied(false), COPY_RESET_DELAY)
     }
   }
 

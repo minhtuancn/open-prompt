@@ -23,18 +23,24 @@ var conversationsSQL string
 //go:embed migrations/005_plugins.sql
 var pluginsSQL string
 
+//go:embed migrations/006_marketplace.sql
+var marketplaceSQL string
+
 // DB wraps sql.DB
 type DB struct {
 	*sql.DB
 }
 
-// Open mở SQLite database tại ~/.open-prompt/open-prompt.db
+// Open mở SQLite database. Ưu tiên OP_DB_PATH env, fallback ~/.open-prompt/open-prompt.db
 func Open() (*DB, error) {
+	if p := config.DBPath(); p != "" {
+		return openPath(p)
+	}
 	dir, err := dataDir()
 	if err != nil {
 		return nil, err
 	}
-	return openPath(filepath.Join(dir, config.DBFileName))
+	return openPath(filepath.Join(dir, config.DBFileName()))
 }
 
 // OpenInMemory mở SQLite in-memory (dùng cho test)
@@ -76,6 +82,9 @@ func Migrate(db *DB) error {
 	}
 	if _, err := db.Exec(pluginsSQL); err != nil {
 		return fmt.Errorf("migration 005 failed: %w", err)
+	}
+	if _, err := db.Exec(marketplaceSQL); err != nil {
+		return fmt.Errorf("migration 006 failed: %w", err)
 	}
 	return nil
 }

@@ -14,12 +14,19 @@ func TestTokenManagerValidateKey(t *testing.T) {
 		key        string
 		wantErr    bool
 	}{
-		{"anthropic", "sk-ant-abc123", false},
+		{"anthropic", "sk-ant-api03-abcdefghijklmnopqrstuvwxyz012345", false},
 		{"anthropic", "", true},
 		{"anthropic", "invalid-no-prefix", true},
-		{"openai", "sk-abc123", false},
+		{"anthropic", "sk-ant-short", true}, // too short
+		{"openai", "sk-proj-abcdefghijklmnop", false},
+		{"openai", "sk-short", true}, // too short
 		{"openai", "", true},
 		{"ollama", "", false},
+		{"gemini", "AIzaSyA-abcdefghijklmnopqrstuvwx", false},
+		{"gemini", "short", true},                  // too short
+		{"gemini", "AIzaSyA-abc def invalid!", true}, // invalid chars
+		{"copilot", "ghu_abcdefghij", false},
+		{"copilot", "short", true},
 	}
 
 	for _, tt := range tests {

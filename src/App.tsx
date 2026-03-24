@@ -3,15 +3,15 @@ import { callEngine, streamQuery } from './hooks/useEngine'
 import { useAuthStore } from './store/authStore'
 import { useOverlayStore } from './store/overlayStore'
 import { useSettingsStore } from './store/settingsStore'
-import { CreateAccount } from './components/onboarding/CreateAccount'
+import { OnboardingWizard } from './components/onboarding/OnboardingWizard'
 import { LoginScreen } from './components/auth/LoginScreen'
 import { CommandInput } from './components/overlay/CommandInput'
 import { ResponsePanel } from './components/overlay/ResponsePanel'
-import { ApiKeySetup } from './components/settings/ApiKeySetup'
 import { SettingsLayout } from './components/settings/SettingsLayout'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import './styles/globals.css'
 
-type AppState = 'loading' | 'first-run' | 'login' | 'api-setup' | 'overlay' | 'settings'
+type AppState = 'loading' | 'onboarding' | 'login' | 'overlay' | 'settings'
 
 const FONT_SIZE_CLASS: Record<string, string> = {
   sm: 'text-sm',
@@ -22,8 +22,15 @@ const FONT_SIZE_CLASS: Record<string, string> = {
 export default function App() {
   const [state, setState] = useState<AppState>('loading')
   const { token } = useAuthStore()
-  const { reset, appendChunk, setStreaming, setError, setFallbackProviders, setLastQuery } = useOverlayStore()
-  const activeProvider = useOverlayStore((s) => s.activeProvider)
+  const { reset, appendChunk, setStreaming, setError, setFallbackProviders, setLastQuery, activeProvider } = useOverlayStore((s) => ({
+    reset: s.reset,
+    appendChunk: s.appendChunk,
+    setStreaming: s.setStreaming,
+    setError: s.setError,
+    setFallbackProviders: s.setFallbackProviders,
+    setLastQuery: s.setLastQuery,
+    activeProvider: s.activeProvider,
+  }))
   const fontSize = useSettingsStore((s) => s.fontSize)
   const fontSizeClass = FONT_SIZE_CLASS[fontSize]
 
@@ -32,7 +39,7 @@ export default function App() {
       try {
         const result = await callEngine<{ is_first_run: boolean }>('auth.is_first_run', {})
         if (result.is_first_run) {
-          setState('first-run')
+          setState('onboarding')
         } else if (!token) {
           setState('login')
         } else {
@@ -95,41 +102,42 @@ export default function App() {
     )
   }
 
-  if (state === 'first-run') {
-    return <CreateAccount onDone={() => setState('api-setup')} />
+  if (state === 'onboarding') {
+    return <OnboardingWizard onComplete={() => setState('overlay')} />
   }
 
   if (state === 'login') {
     return <LoginScreen onDone={() => setState('overlay')} />
   }
 
-  if (state === 'api-setup') {
-    return <ApiKeySetup onDone={() => setState('overlay')} />
-  }
-
   if (state === 'settings') {
     return (
-      <div className={`bg-surface/95 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden ${fontSizeClass}`}>
-        <SettingsLayout onClose={() => setState('overlay')} />
-      </div>
+      <ErrorBoundary>
+        <div className={`bg-surface/95 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden ${fontSizeClass}`}>
+          <SettingsLayout onClose={() => setState('overlay')} />
+        </div>
+      </ErrorBoundary>
     )
   }
 
   return (
-    <div className={`bg-surface/95 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden min-h-16 ${fontSizeClass}`}>
-      <div className="flex items-start">
-        <div className="flex-1 min-w-0">
-          <CommandInput onSubmit={handleQuery} />
+    <ErrorBoundary>
+      <div className={`bg-surface/95 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden min-h-16 ${fontSizeClass}`}>
+        <div className="flex items-start">
+          <div className="flex-1 min-w-0">
+            <CommandInput onSubmit={handleQuery} />
+          </div>
+          <button
+            onClick={() => setState('settings')}
+            title="Cài đặt"
+            aria-label="Cài đặt"
+            className="p-3 mt-2 mr-2 text-white/25 hover:text-white/60 transition-colors text-base shrink-0"
+          >
+            ⚙
+          </button>
         </div>
-        <button
-          onClick={() => setState('settings')}
-          title="Cài đặt"
-          className="p-3 mt-2 mr-2 text-white/25 hover:text-white/60 transition-colors text-base shrink-0"
-        >
-          ⚙
-        </button>
+        <ResponsePanel />
       </div>
-      <ResponsePanel />
-    </div>
+    </ErrorBoundary>
   )
 }

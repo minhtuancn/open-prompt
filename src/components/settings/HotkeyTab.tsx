@@ -1,15 +1,7 @@
 import { useState } from 'react'
 import { callEngine } from '../../hooks/useEngine'
 import { useAuthStore } from '../../store/authStore'
-
-const HOTKEY_OPTIONS = [
-  { label: 'Ctrl + Space', value: 'ctrl+space' },
-  { label: 'Ctrl + Shift + Space', value: 'ctrl+shift+space' },
-  { label: 'Alt + Space', value: 'alt+space' },
-  { label: 'Ctrl + /', value: 'ctrl+/' },
-  { label: 'Ctrl + J', value: 'ctrl+j' },
-  { label: 'Super + Space', value: 'super+space' },
-]
+import { HOTKEY_OPTIONS } from '../../constants/hotkeys'
 
 export function HotkeyTab() {
   const token = useAuthStore((s) => s.token)

@@ -91,6 +91,17 @@ func (s *Server) Listen() error {
 
 // Close đóng server
 func (s *Server) Close() {
+	if s.router != nil {
+		if s.router.rateLimiter != nil {
+			s.router.rateLimiter.Stop()
+		}
+		if s.router.healthChecker != nil {
+			s.router.healthChecker.Stop()
+		}
+		if s.router.tokenExpiryWatcher != nil {
+			s.router.tokenExpiryWatcher.Stop()
+		}
+	}
 	if s.listener != nil {
 		s.listener.Close()
 	}
@@ -100,7 +111,9 @@ func (s *Server) Close() {
 func (s *Server) handleConn(conn net.Conn) {
 	defer conn.Close()
 	scanner := bufio.NewScanner(conn)
-	scanner.Buffer(make([]byte, 1<<20), 1<<20) // 1MB buffer
+	// 1MB scanner buffer — limits max single JSON-RPC message size.
+	// Increase if clients need to send larger payloads (e.g. base64 attachments).
+	scanner.Buffer(make([]byte, 1<<20), 1<<20)
 
 	for scanner.Scan() {
 		line := scanner.Bytes()
@@ -149,8 +162,9 @@ func createListener() (net.Listener, error) {
 	if runtime.GOOS == "windows" {
 		return net.Listen("tcp", "127.0.0.1:0")
 	}
-	os.Remove(config.SocketPath) // xóa stale socket
-	return net.Listen("unix", config.SocketPath)
+	sockPath := config.SocketPath()
+	os.Remove(sockPath) // xóa stale socket
+	return net.Listen("unix", sockPath)
 }
 
 // SendNotification gửi JSON-RPC notification qua connection (dùng cho streaming)

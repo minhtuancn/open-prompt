@@ -1,8 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useOverlayStore } from '../../store/overlayStore'
+import { useAuthStore } from '../../store/authStore'
+import { callEngine } from '../../hooks/useEngine'
 import { SlashMenu, type SlashCommand } from './SlashMenu'
 import { ModelPicker } from './ModelPicker'
 import { MentionHint } from './MentionHint'
+
+/** Module-level regex for @mention detection — avoids recompilation on every keystroke */
+const MENTION_REGEX = /@(\w*)$/
 
 interface Props {
   onSubmit: (input: string, slashName?: string, extraVars?: Record<string, string>) => void
@@ -10,6 +15,7 @@ interface Props {
 
 export function CommandInput({ onSubmit }: Props) {
   const { input, setInput, isStreaming, activeProvider, setActiveProvider } = useOverlayStore()
+  const token = useAuthStore((s) => s.token)
 
   const [commands, setCommands] = useState<SlashCommand[]>([])
   const [slashMenuVisible, setSlashMenuVisible] = useState(false)
@@ -19,17 +25,17 @@ export function CommandInput({ onSubmit }: Props) {
   const [showModelPicker, setShowModelPicker] = useState(false)
   const [mentionQuery, setMentionQuery] = useState('')
   const [showMentionHint, setShowMentionHint] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
-    const token = localStorage.getItem('auth_token')
     if (!token) return
-    window.__rpc?.call('commands.list', { token })
-      .then((res: unknown) => {
-        const data = res as { commands: SlashCommand[] }
+    setError(null)
+    callEngine<{ commands: SlashCommand[] }>('commands.list', { token })
+      .then((data) => {
         setCommands(data.commands || [])
       })
-      .catch(console.error)
+      .catch((e: unknown) => { console.error(e); setError('Không thể tải dữ liệu') })
   }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -47,7 +53,7 @@ export function CommandInput({ onSubmit }: Props) {
     }
 
     // Detect @mention
-    const atMatch = value.match(/@(\w*)$/)
+    const atMatch = value.match(MENTION_REGEX)
     if (atMatch) {
       setMentionQuery(atMatch[1])
       setShowMentionHint(true)
@@ -162,6 +168,8 @@ export function CommandInput({ onSubmit }: Props) {
         </div>
       )}
 
+      {error && <p className="text-red-400 text-sm px-3 py-2">{error}</p>}
+
       <div className="relative">
         <MentionHint query={mentionQuery} onSelect={handleMentionSelect} visible={showMentionHint} />
         <textarea
@@ -181,7 +189,7 @@ export function CommandInput({ onSubmit }: Props) {
           {activeProvider && (
             <span className="text-indigo-400 mr-2">
               @{activeProvider}
-              <button onClick={() => setActiveProvider(null)} className="ml-1 text-white/30 hover:text-white/60">✕</button>
+              <button onClick={() => setActiveProvider(null)} className="ml-1 text-white/30 hover:text-white/60" aria-label="Xoá provider">✕</button>
             </span>
           )}
           {isStreaming ? 'Đang xử lý...' : 'Enter gửi • Ctrl+M chọn model • @ mention provider'}
