@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"log"
 	"net"
 	"strings"
 	"time"
@@ -145,8 +146,12 @@ func (r *Router) handleQueryStream(conn net.Conn, req *Request) (interface{}, *R
 
 	// Lưu vào conversation nếu có conversation_id
 	if p.ConversationID > 0 {
-		_ = r.conversations.AddMessage(p.ConversationID, "user", finalInput, "", "", 0)
-		_ = r.conversations.AddMessage(p.ConversationID, "assistant", sb.String(), providerName, modelName, latency)
+		if err := r.conversations.AddMessage(p.ConversationID, claims.UserID, "user", finalInput, "", "", 0); err != nil {
+			log.Printf("ERROR add user message to conversation %d: %v", p.ConversationID, err)
+		}
+		if err := r.conversations.AddMessage(p.ConversationID, claims.UserID, "assistant", sb.String(), providerName, modelName, latency); err != nil {
+			log.Printf("ERROR add assistant message to conversation %d: %v", p.ConversationID, err)
+		}
 	}
 
 	return nil, nil

@@ -59,7 +59,7 @@ func (r *Router) handleConversationsCreate(req *Request) (interface{}, *RPCError
 
 // handleConversationsMessages trả về messages của conversation
 func (r *Router) handleConversationsMessages(req *Request) (interface{}, *RPCError) {
-	_, rpcErr := r.requireAuth(req)
+	claims, rpcErr := r.requireAuth(req)
 	if rpcErr != nil {
 		return nil, rpcErr
 	}
@@ -72,7 +72,7 @@ func (r *Router) handleConversationsMessages(req *Request) (interface{}, *RPCErr
 		return nil, &RPCError{Code: ErrInvalidParams.Code, Message: "conversation_id bắt buộc"}
 	}
 
-	msgs, err := r.conversations.GetMessages(p.ConversationID)
+	msgs, err := r.conversations.GetMessages(p.ConversationID, claims.UserID)
 	if err != nil {
 		return nil, &RPCError{Code: ErrInternal.Code, Message: fmt.Sprintf("messages: %v", err)}
 	}
