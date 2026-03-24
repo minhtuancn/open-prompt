@@ -44,7 +44,7 @@ export function SettingsLayout({ onClose }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('providers')
   const [skillView, setSkillView] = useState<SkillData | 'new' | null>(null)
   const [skillRefresh, setSkillRefresh] = useState(0)
-  const [promptView, setPromptView] = useState<any | 'new' | null>(null)
+  const [promptView, setPromptView] = useState<{ id?: number; title: string; content: string; category: string; tags: string; is_slash: boolean; slash_name: string } | 'new' | null>(null)
   const [promptRefresh, setPromptRefresh] = useState(0)
 
   const handleSkillSave = () => {
