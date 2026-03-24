@@ -150,6 +150,8 @@ type HistoryEntry struct {
 func (r *HistoryRepo) List(userID int64, limit, offset int) ([]HistoryEntry, error) {
 	if limit <= 0 {
 		limit = 50
+	} else if limit > 1000 {
+		limit = 1000
 	}
 	rows, err := r.db.Query(
 		`SELECT id, query, COALESCE(response,''), COALESCE(provider,''), COALESCE(model,''),
@@ -178,6 +180,8 @@ func (r *HistoryRepo) List(userID int64, limit, offset int) ([]HistoryEntry, err
 func (r *HistoryRepo) Search(userID int64, search string, limit int) ([]HistoryEntry, error) {
 	if limit <= 0 {
 		limit = 20
+	} else if limit > 1000 {
+		limit = 1000
 	}
 	pattern := "%" + search + "%"
 	rows, err := r.db.Query(

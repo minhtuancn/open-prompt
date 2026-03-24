@@ -94,8 +94,13 @@ func newRouter(s *Server) (*Router, error) {
 
 // dispatch gọi handler tương ứng với method
 func (r *Router) dispatch(conn net.Conn, req *Request) (interface{}, *RPCError) {
-	// Rate limiting — dùng remote address làm caller identifier
+	// Rate limiting — ưu tiên user ID từ token, fallback remote address
 	caller := conn.RemoteAddr().String()
+	if tok := extractToken(req); tok != "" {
+		if claims, err := r.auth.ValidateToken(tok); err == nil {
+			caller = fmt.Sprintf("user:%d", claims.UserID)
+		}
+	}
 	if !r.rateLimiter.Allow(req.Method, caller) {
 		return nil, &RPCError{Code: -32003, Message: "rate limit exceeded, vui lòng thử lại sau"}
 	}

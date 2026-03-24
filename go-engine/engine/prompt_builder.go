@@ -19,7 +19,13 @@ func NewPromptBuilder() *PromptBuilder {
 
 // Render render template với map biến
 // Trả về chuỗi đã render hoặc error nếu template sai cú pháp
+// MaxTemplateSize giới hạn kích thước template để tránh DoS
+const MaxTemplateSize = 100000
+
 func (pb *PromptBuilder) Render(tmpl string, vars map[string]string) (string, error) {
+	if len(tmpl) > MaxTemplateSize {
+		tmpl = tmpl[:MaxTemplateSize]
+	}
 	t, err := template.New("prompt").Parse(tmpl)
 	if err != nil {
 		return "", err
