@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useOverlayStore } from '../../store/overlayStore'
+import { useAuthStore } from '../../store/authStore'
 import { SlashMenu, type SlashCommand } from './SlashMenu'
 import { ModelPicker } from './ModelPicker'
 import { MentionHint } from './MentionHint'
@@ -10,6 +11,7 @@ interface Props {
 
 export function CommandInput({ onSubmit }: Props) {
   const { input, setInput, isStreaming, activeProvider, setActiveProvider } = useOverlayStore()
+  const token = useAuthStore((s) => s.token)
 
   const [commands, setCommands] = useState<SlashCommand[]>([])
   const [slashMenuVisible, setSlashMenuVisible] = useState(false)
@@ -22,7 +24,6 @@ export function CommandInput({ onSubmit }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
-    const token = localStorage.getItem('auth_token')
     if (!token) return
     window.__rpc?.call('commands.list', { token })
       .then((res: unknown) => {
