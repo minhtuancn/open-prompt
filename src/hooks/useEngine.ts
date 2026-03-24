@@ -21,23 +21,29 @@ export async function streamQuery(
   onDone: () => void,
   onError: (err: string, fallbackProviders?: string[]) => void,
 ): Promise<void> {
-  const unlisten = await listen<StreamChunkPayload>(
-    'stream-chunk',
-    (event) => {
-      const { delta, done, error, error_message, fallback_providers } = event.payload
-      if (error) {
-        onError(error_message || error, fallback_providers)
-        unlisten()
-        return
+  let unlisten: (() => void) | null = null
+  try {
+    unlisten = await listen<StreamChunkPayload>(
+      'stream-chunk',
+      (event) => {
+        const { delta, done, error, error_message, fallback_providers } = event.payload
+        if (error) {
+          onError(error_message || error, fallback_providers)
+          unlisten?.()
+          return
+        }
+        if (done) {
+          onDone()
+          unlisten?.()
+          return
+        }
+        onChunk(delta)
       }
-      if (done) {
-        onDone()
-        unlisten()
-        return
-      }
-      onChunk(delta)
-    }
-  )
+    )
 
-  callEngine('query.stream', params).catch((e) => onError(String(e)))
+    await callEngine('query.stream', params)
+  } catch (e) {
+    unlisten?.()
+    onError(String(e))
+  }
 }
