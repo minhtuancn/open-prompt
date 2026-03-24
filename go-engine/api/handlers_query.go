@@ -95,10 +95,12 @@ func (r *Router) handleQueryStream(conn net.Conn, req *Request) (interface{}, *R
 		System: p.System,
 	}, func(chunk string) {
 		sb.WriteString(chunk)
-		_ = SendNotification(conn, "stream.chunk", map[string]interface{}{
+		if err := SendNotification(conn, "stream.chunk", map[string]interface{}{
 			"delta": chunk,
 			"done":  false,
-		})
+		}); err != nil {
+			log.Printf("ERROR send stream chunk: %v", err)
+		}
 	})
 
 	latency := time.Since(start).Milliseconds()
@@ -115,26 +117,32 @@ func (r *Router) handleQueryStream(conn net.Conn, req *Request) (interface{}, *R
 		if names := r.providerRegistry.FallbackCandidateNames(providerName); len(names) > 0 {
 			doneParams["fallback_providers"] = names
 		}
-		_ = SendNotification(conn, "stream.chunk", doneParams)
+		if err := SendNotification(conn, "stream.chunk", doneParams); err != nil {
+			log.Printf("ERROR send error notification: %v", err)
+		}
 
-		_ = r.history.Insert(repos.InsertHistoryInput{
+		if err := r.history.Insert(repos.InsertHistoryInput{
 			UserID:    claims.UserID,
 			Query:     finalInput,
 			Provider:  providerName,
 			Model:     modelName,
 			LatencyMs: latency,
 			Status:    repos.HistoryStatusError,
-		})
+		}); err != nil {
+			log.Printf("ERROR insert history (error case): %v", err)
+		}
 		return nil, nil
 	}
 
 	// Done notification
-	_ = SendNotification(conn, "stream.chunk", map[string]interface{}{
+	if err := SendNotification(conn, "stream.chunk", map[string]interface{}{
 		"delta": "",
 		"done":  true,
-	})
+	}); err != nil {
+		log.Printf("ERROR send done notification: %v", err)
+	}
 
-	_ = r.history.Insert(repos.InsertHistoryInput{
+	if err := r.history.Insert(repos.InsertHistoryInput{
 		UserID:    claims.UserID,
 		Query:     finalInput,
 		Response:  sb.String(),
@@ -142,7 +150,9 @@ func (r *Router) handleQueryStream(conn net.Conn, req *Request) (interface{}, *R
 		Model:     modelName,
 		LatencyMs: latency,
 		Status:    repos.HistoryStatusSuccess,
-	})
+	}); err != nil {
+		log.Printf("ERROR insert history (success case): %v", err)
+	}
 
 	// Lưu vào conversation nếu có conversation_id
 	if p.ConversationID > 0 {
