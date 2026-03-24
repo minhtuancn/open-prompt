@@ -52,6 +52,8 @@ func (r *Router) handlePromptsCreate(req *Request) (interface{}, *RPCError) {
 	if p.Title == "" || p.Content == "" {
 		return nil, &RPCError{Code: -32602, Message: "title và content không được rỗng"}
 	}
+	p.Title = truncateString(p.Title, MaxTitleLen)
+	p.Content = truncateString(p.Content, MaxContentLen)
 	if p.IsSlash && !slashNameRegex.MatchString(p.SlashName) {
 		return nil, &RPCError{Code: -32602, Message: "slash_name không hợp lệ: chỉ a-z 0-9 - _ và tối đa 32 ký tự"}
 	}
@@ -93,6 +95,8 @@ func (r *Router) handlePromptsUpdate(req *Request) (interface{}, *RPCError) {
 	if p.ID == 0 || p.Title == "" || p.Content == "" {
 		return nil, copyErr(ErrInvalidParams)
 	}
+	p.Title = truncateString(p.Title, MaxTitleLen)
+	p.Content = truncateString(p.Content, MaxContentLen)
 	if p.IsSlash && !slashNameRegex.MatchString(p.SlashName) {
 		return nil, &RPCError{Code: -32602, Message: "slash_name không hợp lệ"}
 	}
