@@ -12,8 +12,8 @@
 
 | Mức độ | Backend | Frontend | Tổng |
 |--------|---------|----------|------|
-| CRITICAL | 3 | 2 | **5** |
-| HIGH | 6 | 8 | **14** |
+| CRITICAL | 2 | 2 | **4** |
+| HIGH | 7 | 8 | **15** |
 | MEDIUM | 18+ | 18 | **36+** |
 | LOW | 5+ | 7 | **12+** |
 
@@ -27,31 +27,40 @@
 
 **Vấn đề:** `GetMessages()`, `AddMessage()` không kiểm tra `user_id`. Handler gọi `conversations.GetMessages(conversationID)` mà không verify ownership. Kẻ tấn công có thể đọc/ghi conversation của user khác bằng cách đoán ID.
 
+**Lưu ý quan trọng:** `handleConversationsMessages` (line 62) discard `claims` từ `requireAuth` — phải fix cả handler-level để truyền `claims.UserID` xuống repo. Nếu chỉ fix repo mà không fix handler thì IDOR vẫn tồn tại.
+
 **Fix:**
 - Thêm tham số `userID` vào tất cả method của `ConversationRepo`
 - Thêm `AND user_id = ?` vào mọi query liên quan
-- Handler truyền `userID` từ JWT context
-- Áp dụng tương tự cho `handlers_query.go` khi `ConversationID > 0`
+- `handleConversationsMessages`: sử dụng `claims.UserID` từ `requireAuth` (hiện đang bỏ qua)
+- `handleQuery` (handlers_query.go): validate ownership trước khi `AddMessage()` khi `ConversationID > 0`
+- Cả read path (GetMessages) và write path (AddMessage) đều cần fix đồng thời
 
 ### 1.2 XSS trong MarkdownRenderer (Frontend)
 
 **File:** `src/components/overlay/MarkdownRenderer.tsx`
 
-**Vấn đề:** Sử dụng unsafe innerHTML với regex replace tạo HTML. Capture group không được escape đầy đủ sau khi regex replace. Có thể bị XSS qua markdown content đặc biệt.
+**Vấn đề:** Có 2 vector XSS chính:
+1. **Heading branch (lines 39-43)** bypass hoàn toàn `inlineFormat()`/`escapeHtml()` — inject `processed.slice(N)` trực tiếp vào HTML string mà không escape. Input như `# <script>alert(1)</script>` sẽ render raw HTML.
+2. **`escapeHtml()` thiếu escape quote** — không escape `"` và `'`, cho phép attribute injection trong một số trường hợp.
 
 **Fix:**
 - Thay thế bằng thư viện `react-markdown` + `rehype-sanitize` (khuyến nghị)
-- Hoặc nếu giữ custom renderer: escape triệt để mọi capture group, dùng DOMPurify để sanitize output
+- Nếu giữ custom renderer: heading branch phải gọi `inlineFormat()` trước khi inject, mở rộng `escapeHtml()` để escape cả `"` và `'`, dùng DOMPurify để sanitize output cuối cùng
 
-### 1.3 OAuth Placeholder (Backend)
+### 1.3 Goroutine Leak trong RateLimiter (Backend)
 
-**File:** `go-engine/api/handlers_oauth.go`
+**File:** `go-engine/api/ratelimit.go` (lines 37-43)
 
-**Vấn đề:** Hardcoded "PLACEHOLDER" cho OAuth credentials nhưng trả response hợp lệ, tạo cảm giác OAuth đã hoạt động.
+**Vấn đề:** Cleanup goroutine trong `NewRateLimiter` không có `stopCh` hay method `Stop()`. Goroutine chạy vĩnh viễn, leak khi server shutdown hoặc trong tests.
+
+**Lưu ý:** `health_checker.go` và `token_expiry_watcher.go` đã có `Stop()` với `stopCh` pattern — chỉ `ratelimit.go` còn thiếu.
 
 **Fix:**
-- Return error rõ ràng: `"OAuth chưa được cấu hình"` thay vì response thành công giả
-- Hoặc disable endpoint hoàn toàn cho đến khi implement xong
+- Thêm `stopCh chan struct{}` vào `RateLimiter`
+- Thêm method `Stop()` close channel
+- Cleanup goroutine select trên `stopCh`
+- Gọi `Stop()` trong `Server.Close()`
 
 ### 1.4 localStorage Inconsistency (Frontend)
 
@@ -63,16 +72,18 @@
 - Thống nhất dùng `useAuthStore((s) => s.token)` ở mọi nơi
 - Xoá tất cả localStorage access trực tiếp trong components
 
-### 1.5 Goroutine Leaks (Backend)
+### 1.5 (Chuyển xuống HIGH) OAuth Placeholder (Backend)
 
-**File:** `go-engine/api/ratelimit.go`, `go-engine/provider/health_checker.go`, `go-engine/provider/token_expiry_watcher.go`
+**File:** `go-engine/api/handlers_oauth.go`
 
-**Vấn đề:** Khởi chạy goroutine cleanup/check nhưng không có cách dừng khi server shutdown.
+**Vấn đề:** Hardcoded "PLACEHOLDER" cho OAuth credentials. Các endpoint trả message rõ ràng là placeholder (ví dụ: "cần GitHub OAuth App ID thật"), `handleOAuthPoll` trả `"done": false` vĩnh viễn nên không thực sự hoàn thành flow. Tuy nhiên `handleOAuthFinish` trả `"ok": true` kèm placeholder message — gây misleading.
+
+**Mức độ thực tế:** HIGH (misleading UX, không phải security vulnerability vì không grant access)
 
 **Fix:**
-- Thêm method `Stop()` với `context.Context` hoặc `stopCh` cho mỗi service
-- Gọi `Stop()` trong `Server.Close()` / graceful shutdown
-- Đảm bảo `defer Stop()` trong main
+- `handleOAuthFinish`: return `"ok": false` với error message thay vì `"ok": true`
+- Hoặc disable endpoint hoàn toàn cho đến khi implement xong
+- Thêm: fix `rand.Read(buf)` (line 103) không check error return
 
 ---
 
@@ -100,10 +111,10 @@
 - Bỏ qua lỗi khi gọi `AddMessage()` và `Insert()`
 - Fix: log errors, trả partial success response
 
-**2.5 N+1 query trong handleProvidersList**
+**2.5 (Đã xác minh: không phải N+1)** ~~N+1 query trong handleProvidersList~~
 - **File:** `go-engine/api/handlers_providers.go`
-- Loop qua tokens rồi loop qua registry riêng
-- Fix: JOIN query trong SQL, batch health checks
+- **Cập nhật:** Sau khi verify code, handler thực tế chỉ có 1 DB query + in-memory map build + O(1) lookups. Không có N+1 SQL query. Health checks được xử lý bởi `HealthChecker` service riêng.
+- **Thay thế bằng:** OAuth Placeholder (chuyển từ CRITICAL xuống HIGH — xem 1.5)
 
 **2.6 Thiếu string length validation**
 - **File:** Tất cả `handlers_*.go`
@@ -112,10 +123,10 @@
 
 ### Frontend (8 issues)
 
-**2.7 DeviceFlowDialog cleanup**
+**2.7 DeviceFlowDialog unmount safety**
 - **File:** `src/components/overlay/DeviceFlowDialog.tsx`
-- `setInterval` trong useEffect không cleanup đúng
-- Fix: clear interval trong cleanup function, guard `onComplete` khi unmounted
+- Interval cleanup function đã đúng, nhưng `setStatus()` và `onComplete()` vẫn được gọi sau khi component unmount trong async `invoke` callback. Thiếu `isMounted` guard.
+- Fix: thêm `isMountedRef = useRef(true)`, set `false` trong cleanup, check trước mọi state update và callback
 
 **2.8 useEngine race condition**
 - **File:** `src/hooks/useEngine.ts`
@@ -169,7 +180,7 @@
 - **Thiếu request limit** — `Limit`/`Offset` không cap. Fix: `const MaxLimit = 1000`
 - **History aggregation chậm** — `SummaryByPeriod` group by mỗi lần gọi. Fix: dùng bảng pre-aggregated
 - **Thiếu indexes** — `prompts.user_id`, `skills.user_id`, `settings.user_id`
-- **DELETE CASCADE sai** — `history.user_id` dùng `SET NULL` thay vì `CASCADE`
+- **DELETE CASCADE sai** — `history.user_id` dùng `SET NULL` thay vì `CASCADE` (xem `go-engine/db/migrations/001_init.sql` line 61)
 - **Migration version tracking** — `IF NOT EXISTS` không scale. Fix: thêm bảng version tracking
 - **Provider list fetch trùng** — Frontend fetch 3 lần từ 3 component. Fix: cache trong Zustand store
 
@@ -177,9 +188,9 @@
 
 - **Inconsistent repo patterns** — Một số repo truyền `userID`, một số không. Fix: thống nhất convention
 - **Thiếu request validation layer** — Mỗi handler tự decode/validate. Fix: centralized middleware
-- **2 provider registry systems** — `provider.Registry` và `providers.Registry` trùng. Fix: consolidate
+- **2 provider registry systems** — `provider.Registry` (quản lý tokens/credentials) và `model/providers.Registry` (quản lý provider instances). Phục vụ mục đích khác nhau nhưng tên gây nhầm lẫn. Fix: rename cho rõ ràng (ví dụ: `TokenStore` vs `ProviderRegistry`) thay vì merge
 - **Inconsistent state management** — Mix local state và Zustand. Fix: document rule
-- **Global RPC access** — CommandInput dùng `window.__rpc?.call()`. Fix: thống nhất qua `callEngine()`
+- **Global RPC access** — CommandInput dùng `window.__rpc?.call()` (line 27) trong cùng `useEffect` với localStorage anti-pattern. Fix cả hai cùng lúc: thống nhất qua `callEngine()` + `useAuthStore`
 - **Lost error context** — `if err != nil || existing == nil` gộp 2 loại lỗi. Fix: tách check
 - **Weak typing RPC calls** — Unsafe cast. Fix: tạo typed RPC interface
 
@@ -207,6 +218,7 @@
 - Bundle analysis thiếu — `vite-plugin-visualizer`
 - Zustand devtools middleware cho dev mode
 - Scanner buffer check (`server.go`)
+- `rand.Read` unchecked error trong `handlers_oauth.go` line 103
 
 ---
 
