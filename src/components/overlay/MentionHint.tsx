@@ -1,12 +1,6 @@
-import { useEffect, useState } from 'react'
-import { callEngine } from '../../hooks/useEngine'
+import { useEffect } from 'react'
 import { useAuthStore } from '../../store/authStore'
-
-interface ProviderInfo {
-  id: string
-  name: string
-  connected: boolean
-}
+import { useProviderStore } from '../../store/providerStore'
 
 interface Props {
   query: string
@@ -16,16 +10,13 @@ interface Props {
 
 export function MentionHint({ query, onSelect, visible }: Props) {
   const token = useAuthStore((s) => s.token)
-  const [providers, setProviders] = useState<ProviderInfo[]>([])
-  const [error, setError] = useState<string | null>(null)
+  const providers = useProviderStore((s) => s.providers)
+  const error = useProviderStore((s) => s.error)
+  const fetchProviders = useProviderStore((s) => s.fetch)
 
   useEffect(() => {
-    if (!token) return
-    setError(null)
-    callEngine<ProviderInfo[]>('providers.list', { token })
-      .then((list) => setProviders(list ?? []))
-      .catch((e) => { console.error(e); setError('Không thể tải dữ liệu') })
-  }, [token])
+    if (token) fetchProviders(token)
+  }, [token, fetchProviders])
 
   if (!visible || !query) return null
 

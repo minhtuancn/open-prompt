@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log"
 	"regexp"
 
 	"github.com/minhtuancn/open-prompt/go-engine/db/repos"
@@ -103,7 +104,11 @@ func (r *Router) handlePromptsUpdate(req *Request) (interface{}, *RPCError) {
 
 	// Kiểm tra ownership — chống IDOR
 	existing, err := r.prompts.FindByID(p.ID)
-	if err != nil || existing == nil {
+	if err != nil {
+		log.Printf("ERROR find prompt %d: %v", p.ID, err)
+		return nil, copyErr(ErrInternal)
+	}
+	if existing == nil {
 		return nil, &RPCError{Code: -32602, Message: "prompt không tồn tại"}
 	}
 	if existing.UserID != claims.UserID {
@@ -147,7 +152,11 @@ func (r *Router) handlePromptsDelete(req *Request) (interface{}, *RPCError) {
 
 	// Kiểm tra ownership — chống IDOR
 	existing, err := r.prompts.FindByID(p.ID)
-	if err != nil || existing == nil {
+	if err != nil {
+		log.Printf("ERROR find prompt %d for delete: %v", p.ID, err)
+		return nil, copyErr(ErrInternal)
+	}
+	if existing == nil {
 		return nil, &RPCError{Code: -32602, Message: "prompt không tồn tại"}
 	}
 	if existing.UserID != claims.UserID {

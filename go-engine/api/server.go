@@ -152,8 +152,9 @@ func createListener() (net.Listener, error) {
 	if runtime.GOOS == "windows" {
 		return net.Listen("tcp", "127.0.0.1:0")
 	}
-	os.Remove(config.SocketPath) // xóa stale socket
-	return net.Listen("unix", config.SocketPath)
+	sockPath := config.SocketPath()
+	os.Remove(sockPath) // xóa stale socket
+	return net.Listen("unix", sockPath)
 }
 
 // SendNotification gửi JSON-RPC notification qua connection (dùng cho streaming)

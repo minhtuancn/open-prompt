@@ -57,6 +57,8 @@ func (r *ConversationRepo) Create(userID int64, title string) (int64, error) {
 func (r *ConversationRepo) List(userID int64, limit int) ([]Conversation, error) {
 	if limit <= 0 {
 		limit = 20
+	} else if limit > 1000 {
+		limit = 1000
 	}
 	rows, err := r.db.Query(
 		`SELECT id, user_id, title, COALESCE(provider,''), COALESCE(model,''), created_at, updated_at

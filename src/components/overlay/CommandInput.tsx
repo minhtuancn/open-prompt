@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useOverlayStore } from '../../store/overlayStore'
 import { useAuthStore } from '../../store/authStore'
+import { callEngine } from '../../hooks/useEngine'
 import { SlashMenu, type SlashCommand } from './SlashMenu'
 import { ModelPicker } from './ModelPicker'
 import { MentionHint } from './MentionHint'
@@ -27,9 +28,8 @@ export function CommandInput({ onSubmit }: Props) {
   useEffect(() => {
     if (!token) return
     setError(null)
-    window.__rpc?.call('commands.list', { token })
-      .then((res: unknown) => {
-        const data = res as { commands: SlashCommand[] }
+    callEngine<{ commands: SlashCommand[] }>('commands.list', { token })
+      .then((data) => {
         setCommands(data.commands || [])
       })
       .catch((e: unknown) => { console.error(e); setError('Không thể tải dữ liệu') })

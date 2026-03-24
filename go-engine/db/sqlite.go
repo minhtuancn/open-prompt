@@ -31,13 +31,16 @@ type DB struct {
 	*sql.DB
 }
 
-// Open mở SQLite database tại ~/.open-prompt/open-prompt.db
+// Open mở SQLite database. Ưu tiên OP_DB_PATH env, fallback ~/.open-prompt/open-prompt.db
 func Open() (*DB, error) {
+	if p := config.DBPath(); p != "" {
+		return openPath(p)
+	}
 	dir, err := dataDir()
 	if err != nil {
 		return nil, err
 	}
-	return openPath(filepath.Join(dir, config.DBFileName))
+	return openPath(filepath.Join(dir, config.DBFileName()))
 }
 
 // OpenInMemory mở SQLite in-memory (dùng cho test)
