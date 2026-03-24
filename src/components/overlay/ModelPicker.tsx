@@ -1,12 +1,6 @@
-import { useEffect, useState } from 'react'
-import { callEngine } from '../../hooks/useEngine'
+import { useEffect, useState, useMemo } from 'react'
 import { useAuthStore } from '../../store/authStore'
-
-interface ProviderInfo {
-  id: string
-  name: string
-  connected: boolean
-}
+import { useProviderStore } from '../../store/providerStore'
 
 interface Props {
   onSelect: (providerName: string) => void
@@ -15,20 +9,19 @@ interface Props {
 
 export function ModelPicker({ onSelect, onClose }: Props) {
   const token = useAuthStore((s) => s.token)
-  const [providers, setProviders] = useState<ProviderInfo[]>([])
+  const allProviders = useProviderStore((s) => s.providers)
+  const error = useProviderStore((s) => s.error)
+  const fetchProviders = useProviderStore((s) => s.fetch)
   const [selectedIdx, setSelectedIdx] = useState(0)
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!token) return
-    setError(null)
-    callEngine<ProviderInfo[]>('providers.list', { token })
-      .then((list) => {
-        const connected = (list ?? []).filter((p) => p.connected)
-        setProviders(connected.length > 0 ? connected : list ?? [])
-      })
-      .catch((e) => { console.error(e); setError('Không thể tải dữ liệu') })
-  }, [token])
+    if (token) fetchProviders(token)
+  }, [token, fetchProviders])
+
+  const providers = useMemo(() => {
+    const connected = allProviders.filter((p) => p.connected)
+    return connected.length > 0 ? connected : allProviders
+  }, [allProviders])
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
