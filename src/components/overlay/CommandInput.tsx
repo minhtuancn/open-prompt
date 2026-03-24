@@ -186,7 +186,7 @@ export function CommandInput({ onSubmit }: Props) {
           {activeProvider && (
             <span className="text-indigo-400 mr-2">
               @{activeProvider}
-              <button onClick={() => setActiveProvider(null)} className="ml-1 text-white/30 hover:text-white/60">✕</button>
+              <button onClick={() => setActiveProvider(null)} className="ml-1 text-white/30 hover:text-white/60" aria-label="Xoá provider">✕</button>
             </span>
           )}
           {isStreaming ? 'Đang xử lý...' : 'Enter gửi • Ctrl+M chọn model • @ mention provider'}

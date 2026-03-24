@@ -119,6 +119,7 @@ export default function App() {
         <button
           onClick={() => setState('settings')}
           title="Cài đặt"
+          aria-label="Cài đặt"
           className="p-3 mt-2 mr-2 text-white/25 hover:text-white/60 transition-colors text-base shrink-0"
         >
           ⚙
