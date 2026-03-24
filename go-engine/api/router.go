@@ -29,8 +29,9 @@ type Router struct {
 	registry         *provider.Registry
 	providerRegistry *providers.Registry
 	conversations    *repos.ConversationRepo
-	healthChecker    *provider.HealthChecker
-	plugins          *repos.PluginRepo
+	healthChecker      *provider.HealthChecker
+	tokenExpiryWatcher *provider.TokenExpiryWatcher
+	plugins            *repos.PluginRepo
 	marketplace      *repos.MarketplaceRepo
 	rateLimiter      *RateLimiter
 }
@@ -85,8 +86,9 @@ func newRouter(s *Server) (*Router, error) {
 		registry:         registry,
 		providerRegistry: providerReg,
 		conversations:    conversations,
-		healthChecker:    hc,
-		plugins:          pluginRepo,
+		healthChecker:      hc,
+		tokenExpiryWatcher: tew,
+		plugins:            pluginRepo,
 		marketplace:      marketplaceRepo,
 		rateLimiter:      NewRateLimiter(),
 	}, nil

@@ -8,6 +8,7 @@ import { LoginScreen } from './components/auth/LoginScreen'
 import { CommandInput } from './components/overlay/CommandInput'
 import { ResponsePanel } from './components/overlay/ResponsePanel'
 import { SettingsLayout } from './components/settings/SettingsLayout'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import './styles/globals.css'
 
 type AppState = 'loading' | 'onboarding' | 'login' | 'overlay' | 'settings'
@@ -21,8 +22,15 @@ const FONT_SIZE_CLASS: Record<string, string> = {
 export default function App() {
   const [state, setState] = useState<AppState>('loading')
   const { token } = useAuthStore()
-  const { reset, appendChunk, setStreaming, setError, setFallbackProviders, setLastQuery } = useOverlayStore()
-  const activeProvider = useOverlayStore((s) => s.activeProvider)
+  const { reset, appendChunk, setStreaming, setError, setFallbackProviders, setLastQuery, activeProvider } = useOverlayStore((s) => ({
+    reset: s.reset,
+    appendChunk: s.appendChunk,
+    setStreaming: s.setStreaming,
+    setError: s.setError,
+    setFallbackProviders: s.setFallbackProviders,
+    setLastQuery: s.setLastQuery,
+    activeProvider: s.activeProvider,
+  }))
   const fontSize = useSettingsStore((s) => s.fontSize)
   const fontSizeClass = FONT_SIZE_CLASS[fontSize]
 
@@ -104,28 +112,32 @@ export default function App() {
 
   if (state === 'settings') {
     return (
-      <div className={`bg-surface/95 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden ${fontSizeClass}`}>
-        <SettingsLayout onClose={() => setState('overlay')} />
-      </div>
+      <ErrorBoundary>
+        <div className={`bg-surface/95 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden ${fontSizeClass}`}>
+          <SettingsLayout onClose={() => setState('overlay')} />
+        </div>
+      </ErrorBoundary>
     )
   }
 
   return (
-    <div className={`bg-surface/95 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden min-h-16 ${fontSizeClass}`}>
-      <div className="flex items-start">
-        <div className="flex-1 min-w-0">
-          <CommandInput onSubmit={handleQuery} />
+    <ErrorBoundary>
+      <div className={`bg-surface/95 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden min-h-16 ${fontSizeClass}`}>
+        <div className="flex items-start">
+          <div className="flex-1 min-w-0">
+            <CommandInput onSubmit={handleQuery} />
+          </div>
+          <button
+            onClick={() => setState('settings')}
+            title="Cài đặt"
+            aria-label="Cài đặt"
+            className="p-3 mt-2 mr-2 text-white/25 hover:text-white/60 transition-colors text-base shrink-0"
+          >
+            ⚙
+          </button>
         </div>
-        <button
-          onClick={() => setState('settings')}
-          title="Cài đặt"
-          aria-label="Cài đặt"
-          className="p-3 mt-2 mr-2 text-white/25 hover:text-white/60 transition-colors text-base shrink-0"
-        >
-          ⚙
-        </button>
+        <ResponsePanel />
       </div>
-      <ResponsePanel />
-    </div>
+    </ErrorBoundary>
   )
 }
