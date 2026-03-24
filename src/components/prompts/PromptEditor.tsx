@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useAuthStore } from '../../store/authStore'
 
 interface PromptInput {
   id?: number
@@ -17,6 +18,7 @@ interface Props {
 }
 
 export function PromptEditor({ initial, onSave, onCancel }: Props) {
+  const token = useAuthStore((s) => s.token)
   const [form, setForm] = useState<PromptInput>(initial ?? {
     title: '',
     content: '',
@@ -40,7 +42,6 @@ export function PromptEditor({ initial, onSave, onCancel }: Props) {
       return
     }
 
-    const token = localStorage.getItem('auth_token')
     if (!token) {
       setError('Chưa đăng nhập')
       return

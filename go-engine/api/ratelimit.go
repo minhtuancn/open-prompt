@@ -11,6 +11,8 @@ type RateLimiter struct {
 	mu      sync.Mutex
 	buckets map[string]*bucket
 	limits  map[string]limitConfig
+	stopCh  chan struct{}
+	stopped sync.Once
 }
 
 type limitConfig struct {
@@ -32,16 +34,27 @@ func NewRateLimiter() *RateLimiter {
 			"marketplace.publish": {maxRequests: 5, window: time.Minute},
 			"marketplace.search":  {maxRequests: 30, window: time.Minute},
 		},
+		stopCh: make(chan struct{}),
 	}
 	// Cleanup expired buckets mỗi 5 phút để tránh memory leak
 	go func() {
 		ticker := time.NewTicker(5 * time.Minute)
 		defer ticker.Stop()
-		for range ticker.C {
-			rl.cleanup()
+		for {
+			select {
+			case <-ticker.C:
+				rl.cleanup()
+			case <-rl.stopCh:
+				return
+			}
 		}
 	}()
 	return rl
+}
+
+// Stop dừng goroutine cleanup. Idempotent — an toàn khi gọi nhiều lần.
+func (rl *RateLimiter) Stop() {
+	rl.stopped.Do(func() { close(rl.stopCh) })
 }
 
 // Allow kiểm tra xem request có được phép không

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useAuthStore } from '../../store/authStore'
 
 interface Prompt {
   id: number
@@ -15,12 +16,12 @@ interface Props {
 }
 
 export function PromptList({ onEdit }: Props) {
+  const token = useAuthStore((s) => s.token)
   const [prompts, setPrompts] = useState<Prompt[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const loadPrompts = async () => {
-    const token = localStorage.getItem('auth_token')
     if (!token) return
     try {
       const res = await window.__rpc?.call('prompts.list', { token })
@@ -37,7 +38,6 @@ export function PromptList({ onEdit }: Props) {
 
   const handleDelete = async (id: number) => {
     if (!confirm('Xoá prompt này?')) return
-    const token = localStorage.getItem('auth_token')
     if (!token) return
     try {
       await window.__rpc?.call('prompts.delete', { token, id })

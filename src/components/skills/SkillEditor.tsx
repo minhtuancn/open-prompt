@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { callEngine } from '../../hooks/useEngine'
+import { useAuthStore } from '../../store/authStore'
 
 interface Skill {
   id?: number
@@ -24,6 +25,7 @@ const MODELS: Record<string, string[]> = {
 }
 
 export function SkillEditor({ skill, onSave, onCancel }: Props) {
+  const token = useAuthStore((s) => s.token)
   const [name, setName] = useState(skill?.name ?? '')
   const [promptText, setPromptText] = useState(skill?.prompt_text ?? '')
   const [provider, setProvider] = useState(skill?.provider ?? 'anthropic')
@@ -34,8 +36,7 @@ export function SkillEditor({ skill, onSave, onCancel }: Props) {
 
   const handleSave = async () => {
     if (!name.trim()) { setError('Tên skill không được rỗng'); return }
-    const token = localStorage.getItem('auth_token')
-    if (!token) return
+    if (!token) { setError('Chưa đăng nhập'); return }
     setSaving(true)
     setError('')
     try {
