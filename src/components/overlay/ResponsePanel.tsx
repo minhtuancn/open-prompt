@@ -14,10 +14,12 @@ export function ResponsePanel() {
   const [injectedApp, setInjectedApp] = useState('')
   const [copied, setCopied] = useState(false)
   const injectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     return () => {
       if (injectTimerRef.current) clearTimeout(injectTimerRef.current)
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
     }
   }, [])
 
@@ -44,7 +46,8 @@ export function ResponsePanel() {
     try {
       await navigator.clipboard.writeText(text)
       setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
+      copyTimerRef.current = setTimeout(() => setCopied(false), 2000)
     } catch {
       // Fallback cho khi clipboard API không available
       const textarea = document.createElement('textarea')
@@ -54,7 +57,8 @@ export function ResponsePanel() {
       document.execCommand('copy')
       document.body.removeChild(textarea)
       setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
+      copyTimerRef.current = setTimeout(() => setCopied(false), 2000)
     }
   }
 

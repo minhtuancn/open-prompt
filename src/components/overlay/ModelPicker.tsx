@@ -17,15 +17,17 @@ export function ModelPicker({ onSelect, onClose }: Props) {
   const token = useAuthStore((s) => s.token)
   const [providers, setProviders] = useState<ProviderInfo[]>([])
   const [selectedIdx, setSelectedIdx] = useState(0)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!token) return
+    setError(null)
     callEngine<ProviderInfo[]>('providers.list', { token })
       .then((list) => {
         const connected = (list ?? []).filter((p) => p.connected)
         setProviders(connected.length > 0 ? connected : list ?? [])
       })
-      .catch(console.error)
+      .catch((e) => { console.error(e); setError('Không thể tải dữ liệu') })
   }, [token])
 
   useEffect(() => {
@@ -52,15 +54,17 @@ export function ModelPicker({ onSelect, onClose }: Props) {
   if (providers.length === 0) return null
 
   return (
-    <div className="absolute top-0 left-0 right-0 z-50 bg-surface/98 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl p-2">
+    <div className="absolute top-0 left-0 right-0 z-50 bg-surface/98 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl p-2" role="listbox" aria-label="Chọn AI provider">
       <div className="flex items-center justify-between px-3 py-1.5 mb-1">
         <span className="text-xs text-white/50 font-medium">Chọn provider</span>
         <span className="text-xs text-white/30">ESC để đóng</span>
       </div>
+      {error && <p className="text-red-400 text-sm px-3 py-2">{error}</p>}
       {providers.map((p, i) => (
         <button
           key={p.id}
           onClick={() => { onSelect(p.id); onClose() }}
+          aria-label={p.name}
           className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
             i === selectedIdx
               ? 'bg-indigo-500/20 text-white'

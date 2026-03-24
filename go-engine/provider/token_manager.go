@@ -36,13 +36,32 @@ func (tm *TokenManager) ValidateKeyFormat(providerID, key string) error {
 		if !strings.HasPrefix(key, "sk-ant-") {
 			return fmt.Errorf("Anthropic API key phải bắt đầu bằng 'sk-ant-'")
 		}
+		if len(key) < 40 {
+			return fmt.Errorf("Anthropic API key quá ngắn")
+		}
 	case "openai":
 		if !strings.HasPrefix(key, "sk-") {
 			return fmt.Errorf("OpenAI API key phải bắt đầu bằng 'sk-'")
 		}
+		if len(key) < 20 {
+			return fmt.Errorf("OpenAI API key quá ngắn")
+		}
 	case "gemini":
+		if len(key) < 30 {
+			return fmt.Errorf("Gemini API key quá ngắn (cần ít nhất 30 ký tự)")
+		}
+		for _, c := range key {
+			if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_') {
+				return fmt.Errorf("Gemini API key chứa ký tự không hợp lệ")
+			}
+		}
+	case "copilot":
 		if len(key) < 10 {
-			return fmt.Errorf("Gemini API key quá ngắn")
+			return fmt.Errorf("Copilot token quá ngắn")
+		}
+	default:
+		if len(key) < 5 {
+			return fmt.Errorf("API key quá ngắn")
 		}
 	}
 	return nil

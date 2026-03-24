@@ -14,6 +14,11 @@ export function DeviceFlowDialog({ provider, userCode, verificationUri, deviceCo
   const [status, setStatus] = useState<'waiting' | 'success' | 'error'>('waiting')
   const [error, setError] = useState('')
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const isMountedRef = useRef(true)
+
+  useEffect(() => {
+    return () => { isMountedRef.current = false }
+  }, [])
 
   useEffect(() => {
     // Poll mỗi 5 giây
@@ -23,6 +28,7 @@ export function DeviceFlowDialog({ provider, userCode, verificationUri, deviceCo
           provider,
           deviceCode,
         })
+        if (!isMountedRef.current) return
         if (result.done) {
           if (result.error) {
             setStatus('error')

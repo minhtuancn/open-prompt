@@ -28,7 +28,7 @@ export function OnboardingWizard({ onComplete }: Props) {
 
   return (
     <div className="flex items-center justify-center h-screen bg-surface">
-      <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl p-8 w-[480px] max-h-[90vh] overflow-y-auto shadow-2xl">
+      <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl p-8 w-full max-w-[480px] mx-auto px-4 md:px-8 max-h-[90vh] overflow-y-auto shadow-2xl">
         {/* Progress dots */}
         <div className="flex justify-center gap-2 mb-6">
           {Array.from({ length: TOTAL_STEPS }, (_, i) => (

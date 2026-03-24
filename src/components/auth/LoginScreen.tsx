@@ -28,7 +28,7 @@ export function LoginScreen({ onDone }: { onDone: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center h-screen bg-surface text-white">
       <h1 className="text-2xl font-bold mb-6">Đăng nhập</h1>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3 w-80">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3 w-full max-w-sm mx-auto px-4">
         <input
           autoFocus
           className="bg-white/10 rounded-lg px-4 py-2 outline-none focus:ring-2 ring-accent"

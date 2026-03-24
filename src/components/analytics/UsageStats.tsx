@@ -28,10 +28,12 @@ export function UsageStats() {
   const [providers, setProviders] = useState<ProviderTotal[]>([])
   const [summary, setSummary] = useState<DailySummary[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!token) return
     setLoading(true)
+    setError(null)
     Promise.all([
       callEngine<{ providers: ProviderTotal[] }>('analytics.by_provider', { token, period }),
       callEngine<{ summary: DailySummary[] }>('analytics.summary', { token, period }),
@@ -40,7 +42,7 @@ export function UsageStats() {
         setProviders(byProvider.providers ?? [])
         setSummary(bySummary.summary ?? [])
       })
-      .catch(console.error)
+      .catch((e) => { console.error(e); setError('Không thể tải dữ liệu') })
       .finally(() => setLoading(false))
   }, [period, token])
 
@@ -60,6 +62,8 @@ export function UsageStats() {
           </button>
         ))}
       </div>
+
+      {error && <p className="text-red-400 text-sm px-3 py-2">{error}</p>}
 
       {loading ? (
         <div className="text-white/30 text-sm text-center py-8">Đang tải...</div>

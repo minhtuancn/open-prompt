@@ -35,7 +35,10 @@ func (r *Router) handleOAuthStart(req *Request) (interface{}, *RPCError) {
 
 	case "gemini", "google":
 		// Gemini dùng OAuth2 PKCE — tạo authorization URL
-		verifier, challenge := generatePKCE()
+		verifier, challenge, pkceErr := generatePKCE()
+		if pkceErr != nil {
+			return nil, &RPCError{Code: ErrInternal.Code, Message: "không thể tạo PKCE challenge"}
+		}
 		// Placeholder — cần Google Cloud Client ID thật
 		return map[string]interface{}{
 			"method":         "webview",
@@ -69,8 +72,8 @@ func (r *Router) handleOAuthFinish(req *Request) (interface{}, *RPCError) {
 	// Placeholder — exchange code → access_token cần Client ID/Secret thật
 	_ = claims
 	return map[string]interface{}{
-		"ok":      true,
-		"message": "OAuth exchange placeholder — cần Client ID thật",
+		"ok":      false,
+		"message": "OAuth chưa được cấu hình — cần Client ID thật",
 	}, nil
 }
 
@@ -98,11 +101,13 @@ func (r *Router) handleOAuthPoll(req *Request) (interface{}, *RPCError) {
 }
 
 // generatePKCE tạo code_verifier và code_challenge cho OAuth2 PKCE (RFC 7636)
-func generatePKCE() (verifier, challenge string) {
+func generatePKCE() (verifier, challenge string, err error) {
 	buf := make([]byte, 32)
-	rand.Read(buf)
+	if _, err = rand.Read(buf); err != nil {
+		return "", "", fmt.Errorf("PKCE generate failed: %w", err)
+	}
 	verifier = base64.RawURLEncoding.EncodeToString(buf)
 	h := sha256.Sum256([]byte(verifier))
 	challenge = base64.RawURLEncoding.EncodeToString(h[:])
-	return
+	return verifier, challenge, nil
 }

@@ -17,12 +17,14 @@ interface Props {
 export function MentionHint({ query, onSelect, visible }: Props) {
   const token = useAuthStore((s) => s.token)
   const [providers, setProviders] = useState<ProviderInfo[]>([])
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!token) return
+    setError(null)
     callEngine<ProviderInfo[]>('providers.list', { token })
       .then((list) => setProviders(list ?? []))
-      .catch(console.error)
+      .catch((e) => { console.error(e); setError('Không thể tải dữ liệu') })
   }, [token])
 
   if (!visible || !query) return null
@@ -34,6 +36,7 @@ export function MentionHint({ query, onSelect, visible }: Props) {
 
   return (
     <div className="absolute bottom-full left-5 mb-1 bg-surface border border-white/10 rounded-lg shadow-xl p-1 min-w-48 z-50">
+      {error && <p className="text-red-400 text-sm px-3 py-2">{error}</p>}
       {filtered.map((p) => (
         <button
           key={p.id}
