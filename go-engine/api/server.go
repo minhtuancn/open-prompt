@@ -91,6 +91,9 @@ func (s *Server) Listen() error {
 
 // Close đóng server
 func (s *Server) Close() {
+	if s.router != nil && s.router.rateLimiter != nil {
+		s.router.rateLimiter.Stop()
+	}
 	if s.listener != nil {
 		s.listener.Close()
 	}
