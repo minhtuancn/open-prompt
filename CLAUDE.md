@@ -36,6 +36,22 @@ npm run tauri dev       # full app in dev mode
 ./scripts/build-engine.sh   # builds Go for all platforms → src-tauri/binaries/
 ```
 
+### Build Tauri (Linux)
+```bash
+npm run tauri build          # produces .deb + .AppImage in src-tauri/target/release/bundle/
+```
+
+### Build Tauri (Windows cross-compile từ Linux)
+```bash
+# Yêu cầu: cargo-xwin, rustup target add x86_64-pc-windows-msvc
+cargo install cargo-xwin
+rustup target add x86_64-pc-windows-msvc
+npm run tauri -- build --target x86_64-pc-windows-msvc --runner "cargo-xwin"
+# Produces: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/open-prompt_*_x64-setup.exe
+```
+**Lưu ý Windows build**: `cargo-xwin` tự tải MSVC CRT + Windows SDK (~400MB, lần đầu).
+NSIS chỉ hỗ trợ `"languages": ["English"]` khi cross-compile — `makensis` trên Ubuntu crash với Vietnamese.
+
 ## Key Files
 
 | File | Purpose |

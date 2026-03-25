@@ -55,8 +55,8 @@
       "digestAlgorithm": "sha256",
       "timestampUrl": "http://timestamp.digicert.com",
       "nsis": {
-        "displayLanguageSelector": true,
-        "languages": ["English", "Vietnamese"],
+        "displayLanguageSelector": false,
+        "languages": ["English"],
         "installerIcon": "icons/icon.png"
       }
     },
