@@ -1,13 +1,17 @@
 use tauri::menu::{MenuBuilder, MenuItemBuilder};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Error};
+use tauri::{AppHandle, Error, Manager};
 
 pub fn setup_tray(app: &AppHandle) -> Result<(), Error> {
     let open = MenuItemBuilder::with_id("open", "Open (Ctrl+Space)").build(app)?;
     let quit = MenuItemBuilder::with_id("quit", "Quit Open Prompt").build(app)?;
     let menu = MenuBuilder::new(app).items(&[&open, &quit]).build()?;
 
+    let icon = app.default_window_icon().cloned()
+        .expect("no app icon found");
+
     TrayIconBuilder::new()
+        .icon(icon)
         .menu(&menu)
         .tooltip("Open Prompt")
         .on_menu_event(|app, event| match event.id.as_ref() {

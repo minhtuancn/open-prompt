@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2] - 2026-03-25
+
+### Bug Fixes
+- **Tray icon hiện thị** — truyền icon rõ ràng vào TrayIconBuilder thay vì để mặc định
+- **Hiện UI khi khởi động** — overlay window tự mở khi app start
+
+
 ## [1.0.1] - 2026-03-25
 
 ### Bug Fixes

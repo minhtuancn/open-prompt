@@ -1,6 +1,6 @@
 {
   "productName": "open-prompt",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "identifier": "com.minhtuancn.open-prompt",
   "build": {
     "frontendDist": "../dist",
@@ -24,7 +24,7 @@
         "transparent": true,
         "alwaysOnTop": true,
         "skipTaskbar": true,
-        "visible": false,
+        "visible": true,
         "center": true,
         "focus": true
       }

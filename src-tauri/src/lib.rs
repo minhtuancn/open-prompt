@@ -8,6 +8,8 @@ mod window;
 
 pub use sidecar::{EnginePort, EngineSecret, SidecarState};
 
+use tauri::Manager;
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -27,6 +29,11 @@ pub fn run() {
                 .expect("failed to spawn go engine");
             tray::setup_tray(app.handle())?;
             hotkey::register_hotkey(app.handle())?;
+            // Hiện overlay ngay khi khởi động
+            if let Some(window) = app.get_webview_window("overlay") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
             Ok(())
         })
         .run(tauri::generate_context!())
