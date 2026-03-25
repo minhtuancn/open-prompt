@@ -37,7 +37,7 @@
   "plugins": {
     "updater": {
       "endpoints": ["https://github.com/minhtuancn/open-prompt-release/releases/latest/download/update-manifest.json"],
-      "pubkey": ""
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY4OUJERTAwRTg2QzUyRjgKUldUNFVtem9BTjZiYUFJb1BKaDU0THdoN2NYOERjeXZSRE54RkRTSHI2akcwYWJTRWZGSWZnaXQK"
     }
   },
   "bundle": {
