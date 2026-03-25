@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.3] - 2026-03-25
+
+### Bug Fixes
+- **Windows IPC** — EnginePort dùng AtomicU16, fix double-manage bug (port mãi = 0 → IPC fail trên Windows)
+- **Icon RGBA** — Tauri yêu cầu PNG color type 6 (RGBA), đã fix 8-bit RGBA
+- **Tray icon** — xóa unused Manager import
+- **Dead code** — silence warnings cho OAuthStartResponse fields và window_title
+
+
 ## [1.0.2] - 2026-03-25
 
 ### Bug Fixes

@@ -1,6 +1,6 @@
 use tauri::menu::{MenuBuilder, MenuItemBuilder};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Error, Manager};
+use tauri::{AppHandle, Error};
 
 pub fn setup_tray(app: &AppHandle) -> Result<(), Error> {
     let open = MenuItemBuilder::with_id("open", "Open (Ctrl+Space)").build(app)?;

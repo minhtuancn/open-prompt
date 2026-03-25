@@ -1,6 +1,7 @@
 use std::io::{BufRead, BufReader};
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU16, Ordering};
 use tauri::{AppHandle, Manager};
 
 /// SidecarState giữ process handle của Go engine
@@ -9,8 +10,9 @@ pub struct SidecarState(pub Mutex<Option<Child>>);
 /// EngineSecret lưu shared secret để IPC dùng
 pub struct EngineSecret(pub String);
 
-/// EnginePort lưu TCP port (chỉ dùng trên Windows)
-pub struct EnginePort(pub u16);
+/// EnginePort lưu TCP port (chỉ dùng trên Windows).
+/// Dùng AtomicU16 để có thể cập nhật sau khi đã manage.
+pub struct EnginePort(pub AtomicU16);
 
 /// Spawn Go engine sidecar và đợi "ready" signal từ stdout
 pub fn spawn_engine(app: &AppHandle) -> Result<(), String> {
@@ -54,7 +56,7 @@ pub fn spawn_engine(app: &AppHandle) -> Result<(), String> {
             .next()
             .and_then(|p| p.parse().ok())
             .ok_or_else(|| format!("cannot parse port from engine output: {trimmed}"))?;
-        app.manage(EnginePort(port));
+        app.state::<EnginePort>().0.store(port, Ordering::SeqCst);
     } else {
         return Err(format!("unexpected startup output: {line}"));
     }

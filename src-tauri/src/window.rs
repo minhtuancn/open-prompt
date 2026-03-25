@@ -7,6 +7,7 @@ pub struct FocusedApp(pub Mutex<AppContext>);
 #[derive(Debug, Clone, Default)]
 pub struct AppContext {
     pub app_name: String,
+    #[allow(dead_code)]
     pub window_title: String,
     pub is_terminal: bool,
 }

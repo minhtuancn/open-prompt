@@ -1,6 +1,6 @@
 {
   "productName": "open-prompt",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "identifier": "com.minhtuancn.open-prompt",
   "build": {
     "frontendDist": "../dist",

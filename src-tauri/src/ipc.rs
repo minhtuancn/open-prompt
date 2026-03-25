@@ -74,7 +74,7 @@ pub async fn call_engine(
         }
         #[cfg(windows)]
         {
-            let port = app_clone.state::<crate::sidecar::EnginePort>().0;
+            let port = app_clone.state::<crate::sidecar::EnginePort>().0.load(std::sync::atomic::Ordering::SeqCst);
             let addr = format!("127.0.0.1:{port}");
             let mut conn = std::net::TcpStream::connect(&addr)
                 .map_err(|e| format!("connect {addr}: {e}"))?;
@@ -128,7 +128,7 @@ pub fn call_engine_sync(
     #[cfg(windows)]
     {
         use std::net::TcpStream;
-        let port = app.state::<crate::sidecar::EnginePort>().0;
+        let port = app.state::<crate::sidecar::EnginePort>().0.load(std::sync::atomic::Ordering::SeqCst);
         let addr = format!("127.0.0.1:{port}");
         let mut conn = TcpStream::connect(&addr).map_err(|e| format!("connect {addr}: {e}"))?;
         conn.write_all(&msg).map_err(|e| e.to_string())?;

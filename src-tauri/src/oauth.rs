@@ -7,9 +7,13 @@ use crate::ipc::call_engine_sync;
 struct OAuthStartResponse {
     method: String,
     url: Option<String>,
+    #[allow(dead_code)]
     user_code: Option<String>,
+    #[allow(dead_code)]
     verification_uri: Option<String>,
+    #[allow(dead_code)]
     device_code: Option<String>,
+    #[allow(dead_code)]
     message: Option<String>,
 }
 

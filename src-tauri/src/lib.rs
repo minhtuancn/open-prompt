@@ -16,7 +16,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(SidecarState(std::sync::Mutex::new(None)))
-        .manage(EnginePort(0))
+        .manage(EnginePort(std::sync::atomic::AtomicU16::new(0)))
         .manage(window::FocusedApp(std::sync::Mutex::new(window::AppContext::default())))
         .invoke_handler(tauri::generate_handler![
             ipc::call_engine,
