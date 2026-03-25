@@ -57,7 +57,7 @@
       "nsis": {
         "displayLanguageSelector": false,
         "languages": ["English"],
-        "installerIcon": "icons/icon.png"
+        "installerIcon": "icons/icon.ico"
       }
     },
     "linux": {
