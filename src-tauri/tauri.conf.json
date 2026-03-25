@@ -48,8 +48,7 @@
     "macOS": {
       "signingIdentity": null,
       "entitlements": null,
-      "minimumSystemVersion": "10.15",
-      "notarizationCredentials": null
+      "minimumSystemVersion": "10.15"
     },
     "windows": {
       "certificateThumbprint": null,
