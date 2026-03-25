@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.1] - 2026-03-25
+
+### Bug Fixes
+- **Tray icon** — fix icon hiện màu tím trên Windows (iconAsTemplate phải là false)
+- **Tray menu** — thêm "Open (Ctrl+Space)" để user biết cách mở overlay
+- **Tray click** — click chuột trái vào tray icon để toggle overlay
+
+
 ## [1.0.0] - 2026-03-25
 
 ### Public Release
