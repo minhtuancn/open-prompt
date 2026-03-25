@@ -1,11 +1,13 @@
 # Changelog
 
-## [1.0.0] - 2026-03-23
+## [1.0.0] - 2026-03-25
 
 ### Public Release
-- **Release workflow** — GitHub Actions auto-build + artifact upload cho 4 platforms
-- **Update manifest** — auto-generate manifest khi publish release
-- **Code signing** — config cho Windows Authenticode + macOS notarization
+- **Release workflow** — GitHub Actions auto-build cho 4 platforms: Windows (NSIS), macOS Intel/ARM (DMG), Linux (deb + AppImage)
+- **Tauri updater** — pubkey signing, auto-update manifest từ release repo
+- **CI/CD fixes** — fix rust-toolchain action, permissions, NSIS icon, macOS signing
+- **Security hardening** — fix IDOR, SQL injection, XSS, rate limiting
+- **Code quality** — deduplicate queries, fix memory leaks, giảm DB round-trips
 - **Platform installers** — NSIS (Windows), DMG (macOS), deb + AppImage (Linux)
 - **Documentation site** — VitePress với guide + API reference
 - **Onboarding wizard** — 5 bước: welcome → account → provider → hotkey → done
@@ -35,55 +37,30 @@
 
 ## [0.2.0] - 2026-03-23
 
-### Phase 2A: Multi-Provider Engine
+### Multi-Provider Engine
 - **Provider Interface** — interface chuẩn cho tất cả AI providers
 - **6 Providers** — Anthropic, OpenAI, Ollama, Gemini, Copilot, Gateway
 - **ProviderRegistry** — Route, Default, FallbackCandidates
 - **@Mention Routing** — `@claude`, `@gpt4`, `@gemini`, etc
-- **ParseMention** — tách alias từ prompt
 - **Auto-detect** — env vars, CLI (gh auth token), localport scanning
-- **Auto-register** — providers từ DB tokens + env vars khi khởi động
-- **3 API handlers** — add_gateway, validate, remove
 - **Gateway Presets** — Ollama, LiteLLM, OpenRouter, vLLM
-
-### Phase 2A3: Frontend Multi-Provider
 - **ModelPicker** — Ctrl+M quick-switch với keyboard navigation
-- **MentionHint** — @mention dropdown gợi ý providers
-- **FallbackDialog** — interactive retry khi provider fail
-- **GatewayForm** — preset templates cho gateway
-- **overlayStore** — activeProvider, activeModel, fallbackProviders
-
-### Phase 2B: OAuth + Prompt Library
 - **History API** — history.list, history.search với pagination
-- **HistoryPanel** — browse + search history
-- **Prompts Tab** — PromptList/PromptEditor wired vào Settings
-- **OAuth handlers** — PKCE, Device Flow placeholders
-- **Settings 8 tabs** — Providers, Prompts, Skills, History, Hotkey, Appearance, Language, Analytics
-
-### Phase 2C: Text Injection
-- **Clipboard backup/restore** — không mất data user
-- **Smart injection** — terminal → typing, non-terminal → clipboard
-- **Copy button** — ngoài Insert
-- **Wayland support** — swaymsg (Sway), hyprctl (Hyprland)
-- **App name feedback** — hiện tên app đã inject
-
-### Phase 3-7: Completion
+- **Smart text injection** — clipboard backup, Wayland support
+- **i18n 7 ngôn ngữ** — vi, en, fr, zh-CN, th, lo, ru
 - **Conversations** — multi-turn chat với messages table
-- **i18n 7 ngôn ngữ** — fr, zh-CN, th, lo, ru
 - **Health Checker** — ping providers mỗi 5 phút
-- **Build scripts** — cross-compile, dev, release
-- **Documentation** — README, CHANGELOG, ROADMAP
 
 ## [0.1.0] - 2026-03-22
 
-### Phase 1: Foundation
-- Tauri v2 shell — hotkey, window, system tray
+### Foundation
+- Tauri v2 shell — global hotkey, overlay window, system tray
 - Go Engine sidecar — JSON-RPC 2.0 qua Unix socket
 - Auth — bcrypt + JWT multi-user
-- SQLite database — migrations, repos
+- SQLite database — migrations, repos pattern
 - Overlay UI — CommandInput, ResponsePanel, SlashMenu
-- Streaming — SSE from Anthropic API
-- Settings — 6 tabs (Providers, Skills, Hotkey, Appearance, Language, Analytics)
+- Streaming — SSE từ Anthropic API
+- Settings — 6 tabs
 - Skills/Analytics API + UI
 - i18n — vi/en
 - Text injection — clipboard + enigo

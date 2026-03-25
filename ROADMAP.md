@@ -20,12 +20,10 @@
 - [x] Smart text injection (clipboard backup, Wayland)
 - [x] Health checker
 - [x] Conversations (multi-turn)
-- [x] Build scripts
 
 ### v0.3.0 — Production Polish
 - [x] OAuth WebView hoàn chỉnh (Google, GitHub Device Flow)
 - [x] Tauri auto-updater integration
-- [x] Code signing config (Windows Authenticode, macOS notarization)
 - [x] Conversation context trong query (multi-turn streaming)
 - [x] Drag-drop model priority trong ProvidersTab
 - [x] Token expiry watcher + callback
@@ -37,14 +35,16 @@
 - [x] Keyboard shortcut customization
 - [x] Usage analytics daily aggregation (usage_daily table)
 
-### v1.0.0 — Public Release
-- [x] Release workflow (GitHub Actions auto-build + artifacts)
-- [x] Update manifest auto-generate
+### v1.0.0 — Public Release ✅
+- [x] Release workflow (GitHub Actions, 4 platforms)
+- [x] Tauri update signing + pubkey
+- [x] Security hardening (IDOR, SQL injection, XSS, rate limiting)
 - [x] Platform installers (NSIS, DMG, deb, AppImage)
 - [x] Documentation site (VitePress)
 - [x] Onboarding wizard (5 bước)
 - [x] Community prompts marketplace
 - [x] Telemetry opt-in
+- [x] MIT License
 
 ## Kế hoạch
 
@@ -55,3 +55,4 @@
 - [ ] Auto-update Go Engine sidecar
 - [ ] Crash reporting (Sentry)
 - [ ] Keyboard shortcut recorder (tuỳ chỉnh tự do)
+- [ ] Apple Developer signing + notarization
