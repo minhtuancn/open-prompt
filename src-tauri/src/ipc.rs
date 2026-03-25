@@ -150,7 +150,7 @@ pub fn call_engine_sync(
 /// handle_response đọc response(s) từ socket
 fn handle_response<R: BufRead>(
     mut reader: R,
-    is_streaming: bool,
+    _is_streaming: bool,
     app: &AppHandle,
 ) -> Result<Value, String> {
     loop {

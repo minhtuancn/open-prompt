@@ -32,7 +32,11 @@ pub async fn start_oauth(app: AppHandle, provider: String) -> Result<serde_json:
         "webview" => {
             // Mở WebView window nhỏ cho OAuth login
             if let Some(url) = &response.url {
-                let oauth_window = WebviewWindowBuilder::new(
+                let app_handle = app.clone();
+                let provider_clone = provider.clone();
+                // Monitor navigation — detect redirect về open-prompt://
+                // on_navigation phải đặt trong builder chain (Tauri v2)
+                WebviewWindowBuilder::new(
                     &app,
                     "oauth",
                     WebviewUrl::External(url.parse().map_err(|e| format!("parse url: {e}"))?),
@@ -41,32 +45,27 @@ pub async fn start_oauth(app: AppHandle, provider: String) -> Result<serde_json:
                 .inner_size(480.0, 640.0)
                 .resizable(true)
                 .center()
-                .build()
-                .map_err(|e| format!("create oauth window: {e}"))?;
-
-                // Monitor navigation — detect redirect về open-prompt://
-                let app_handle = app.clone();
-                oauth_window.on_navigation(move |url| {
+                .on_navigation(move |url: &url::Url| {
                     let url_str = url.as_str();
                     if url_str.starts_with("open-prompt://oauth") {
                         // Extract code từ URL
-                        if let Some(code) = url.query_pairs().find(|(k, _)| k == "code").map(|(_, v)| v.to_string()) {
-                            // Gọi oauth_finish
+                        if let Some(code) = url.query_pairs().find(|(k, _): &(_, _)| k == "code").map(|(_, v)| v.to_string()) {
                             let params = serde_json::json!({
                                 "token": "",
-                                "provider": &provider,
+                                "provider": &provider_clone,
                                 "code": code,
                             });
                             let _ = call_engine_sync(&app_handle, "providers.oauth_finish", params);
                         }
-                        // Đóng OAuth window
                         if let Some(win) = app_handle.get_webview_window("oauth") {
                             let _ = win.close();
                         }
                         return false; // Không navigate
                     }
                     true // Cho phép navigate
-                });
+                })
+                .build()
+                .map_err(|e| format!("create oauth window: {e}"))?;
             }
             Ok(result)
         }
